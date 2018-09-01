@@ -1,0 +1,73 @@
+http://files.magusgeek.com/csb/csb.html
+https://github.com/iMarv/RacerAI/blob/master/code.js
+
+simulation?
+https://github.com/inoryy/csb-ai-starter
+
+
+CPP bundler
+https://github.com/MarcosCosmos/cg-cpp-bundler
+
+PLUS D'INFOS SUR LES COEFFICIENTS DE TOUT:
+https://github.com/robostac/coders-strike-back-referee/
+
+
+
+
+Counterbalance 10:00PM
+the idea is to go to the next checkpoint, but subtract your current velocity - so you aim at a different spot
+JHBonarius 10:01PM
+FINALLY FIXED MY PASCAL BUG!
+Counterbalance 10:01PM
+and the value that works best is to subtract 3* your velocity.
+^ subtract the vector, not the abs value ;)
+
+
+-3vel
+In the game page there's a few links, one of them is on PID controllers and steering
+
+
+
+well, a tiny part is missing regarding thrust
+ the size of vector between where you are and the point you're aiming at, also tells you how fast to go
+ if it's larger than the distance you can travel in one turn, use the max thrust of 100; if the distance is < 100, use less thrust; you'll end up with zero velocity exactly at that point you're aiming at.
+ (if you tweak the numbers and take current velocity into account etc..)
+ Do you calculalte your velocity? It's  current_pos - prev_pos
+ 
+ 
+ https://pastebin.com/bQnBHitX
+ that's what basically got me to gold
+ 
+ 
+ 
+ 
+ what should happen if (checkpoint.dist(pod.position - 3*pod.velocity) < checkpointRadius) ?
+ - Epsiom you start aiming for the checkpoint after that - or if you don't know, the center of the map
+ - Epsiom point towards next checkpoint (or if you don;t know what it is, thrust =0)
+ 
+ 
+ Epsiom use a minimum thrust of 10 or so, it should help, and remove that turnsSinceLastCheckpoint - it might only trigger at the end of the last lap in most games..
+ 
+ IMPORTANT:
+ btw you only pass a checkpoint if the center of the pod is inside the checkpoint, so the pod radius doesn't matter here
+ 
+ 
+ Epsiom 10:36PM
+ Okay so the check with the velocity from earlier
+ (checkpoint.dist(pod.position - 3*pod.velocity) < checkpointRadius)
+ It's just to guarantee that from now on, even if I turn, I should be passing the checkpoint?
+Counterbalance 10:39PM
+what it does is see if you are within the checkpoint on the next turn
+Epsiom 10:40PM
+where does my outpust thrust is into this?
+ Does it work regardless of it?
+ Counterbalance 10:42PM
+in most cases, yes, even at max thrust, but, you could end up spinning around a checkpoint
+it's better to modulate thrust based on your angle
+Epsiom 10:43PM
+what?
+ in what way?
+Counterbalance 10:43PM
+if you're facing more than 90 deg away from the checkpoint, it's better not to thrust, or you'll move away from the checkpoint, instead of closer
+ that's the basic idea
+ 
