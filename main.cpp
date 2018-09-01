@@ -15,8 +15,9 @@ const int MAP_WIDTH = 16000;
 const int MAP_HEIGHT = 9000;
 const int MAP_CENTER_X = MAP_WIDTH/2;
 const int MAP_CENTER_Y = MAP_HEIGHT/2;
-const int CHECKPOINT_RADIUS = 350;
+const int CHECKPOINT_RADIUS = 600;
 
+const int CHECKPOINT_BOOST_APPROACH_DIST = 6000;
 const int CHECKPOINT_APPROACH_DIST = 1000;
 const int TURN_APPROACH_MIN = 30;
 
@@ -69,6 +70,7 @@ int main()
 	int previousCheckpointY = -1;
 	int turnsSinceLastCheckpoint = 0;
 	int checkpointNumber = 0;
+	bool isBoostAvailable = true;
 	
 	
     // game loop
@@ -84,7 +86,7 @@ int main()
         int opponentY;
         cin >> opponentX >> opponentY; cin.ignore();
 		
-		
+		/*
 		//Le premier tour, ajoute les checkpoint apres leur passage
         Checkpoint currentCheckpoint (currentCheckpointNumber, nextCheckpointX, nextCheckpointY);
 		if (lapNumber == 0){
@@ -94,29 +96,43 @@ int main()
 				turnsSinceLastCheckpoint = 0;
 			}
 		}
-		
+		*/
 		
 		//Permet temporairement de verifier si on a change de checkpoint
 		if (previousCheckpointX != nextCheckpointX || previousCheckpointY != nextCheckpointY){
-			
+			turnsSinceLastCheckpoint = 0;
 		}
+		
         
         int thrust = 0;
-        if (nextCheckpointAngle > 90 || nextCheckpointAngle < -90 || nextCheckpointDist < 1000){
+		int destinationX = nextCheckpointX;
+		int destinationY = nextCheckpointY;
+        if (nextCheckpointAngle > 90 || nextCheckpointAngle < -90){
             thrust = 0;
         }
-        else {
-            thrust = 100;
-            if (nextCheckpointDist < 1000) thrust = 30;
+		else{
+			thrust = 100;
+			if (nextCheckpointDist < CHECKPOINT_APPROACH_DIST && turnsSinceLastCheckpoint > 10){
+				thrust = 0;
+				destinationX = MAP_CENTER_X;
+				destinationY = MAP_CENTER_Y;
+			}
+			if (isBoostAvailable
+					&& nextCheckpointDist >= CHECKPOINT_BOOST_APPROACH_DIST
+					&& nextCheckpointAngle < 20
+					&& nextCheckpointAngle > -20){
+			    thrust = 999;   //BOOST
+			    isBoostAvailable = false;
+			}
         }
 		
-		
-		//
-		if (nextCheckpointDist < CHECKPOINT_APPROACH_DIST){
-			
+		turnsSinceLastCheckpoint++;
+		if (thrust <= 100){
+		    cout << destinationX << " " << destinationY << " " << thrust << endl;
 		}
-
-        cout << nextCheckpointX << " " << nextCheckpointY << " " << thrust << endl;
+		else{
+			cout << destinationX << " " << destinationY << " " << "BOOST" << endl;
+		}
     }
 }
 
