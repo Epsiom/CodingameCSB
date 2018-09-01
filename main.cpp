@@ -16,10 +16,21 @@ const int MAP_HEIGHT = 9000;
 const int MAP_CENTER_X = MAP_WIDTH/2;
 const int MAP_CENTER_Y = MAP_HEIGHT/2;
 const int CHECKPOINT_RADIUS = 600;
+const int POD_RADIUS = 400;	//btw you only pass a checkpoint if the center of the pod is inside the checkpoint, so the pod radius doesn't matter here
 
 const int CHECKPOINT_BOOST_APPROACH_DIST = 6000;
 const int CHECKPOINT_APPROACH_DIST = 1000;
 const int TURN_APPROACH_MIN = 30;
+
+//(x - (speed.valueX() * 3)
+//It corrects your aim for centrifugal force
+
+/*
+rotation is limited to +/- 18 deg,
+accelleration is ignored,
+velocity is (to - cur).normalize() * thrust * friction,
+and friction is 0.85
+*/
 
 /*
 class Checkpoint {
