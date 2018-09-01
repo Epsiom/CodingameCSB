@@ -1,3 +1,9 @@
+// Write an action using cout. DON'T FORGET THE "<< endl"
+// To debug: cerr << "Debug messages..." << endl;
+// You have to output the target position
+// followed by the power (0 <= thrust <= 100)
+// i.e.: "x y thrust"
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -5,8 +11,15 @@
 
 using namespace std;
 
-// Write an action using cout. DON'T FORGET THE "<< endl"
-// To debug: cerr << "Debug messages..." << endl;
+const int MAP_WIDTH = 16000;
+const int MAP_HEIGHT = 9000;
+const int MAP_CENTER_X = MAP_WIDTH/2;
+const int MAP_CENTER_Y = MAP_HEIGHT/2;
+const int CHECKPOINT_RADIUS = 350;
+
+const int CHECKPOINT_APPROACH_DIST = 1000;
+const int TURN_APPROACH_MIN = 30;
+
 /*
 class Checkpoint {
     private:
@@ -30,6 +43,9 @@ bool addNewCheckpoint(vector<Checkpoint> checkpointList, Checkpoint currentCheck
 	
     //Pas de probleme sur back, qui n'est pas evalue si la liste est vide
 	if (checkpointList.empty() || checkpointList.back() != currentCheckpoint){
+		
+		//TODO: ajouter le depart initialement si la liste est vide
+		
 		checkpointList.push_back(currentCheckpoint);
 		return true;
 	}
@@ -38,15 +54,22 @@ bool addNewCheckpoint(vector<Checkpoint> checkpointList, Checkpoint currentCheck
 */
 
 
+
 int main()
 {
-    final int CHECKPOINT_APPROACH_DIST = 1000;
+    
     /*
     vector<Checkpoint> checkpointList;
-    int currentCheckpointNumber = 0;
 	int lapNumber = 0;
-	int turnsSinceLastCheckpoint = 0;	//TODO
+	
 	*/
+	
+	//Permet temporairement de verifier si on a change de checkpoint
+	int previousCheckpointX = -1;
+	int previousCheckpointY = -1;
+	int turnsSinceLastCheckpoint = 0;
+	int checkpointNumber = 0;
+	
 	
     // game loop
     while (1) {
@@ -61,17 +84,22 @@ int main()
         int opponentY;
         cin >> opponentX >> opponentY; cin.ignore();
 		
-		/*
+		
 		//Le premier tour, ajoute les checkpoint apres leur passage
         Checkpoint currentCheckpoint (currentCheckpointNumber, nextCheckpointX, nextCheckpointY);
 		if (lapNumber == 0){
-			bool checkpointJustPassed = addNewCheckpoint(checkpointList, currentCheckpoint, currentCheckpointNumber);
-			if (checkpointJustPassed){
+			bool checkpointChanged = addNewCheckpoint(checkpointList, currentCheckpoint, currentCheckpointNumber);
+			if (checkpointChanged){
 				currentCheckpointNumber++;
 				turnsSinceLastCheckpoint = 0;
 			}
 		}
-        */
+		
+		
+		//Permet temporairement de verifier si on a change de checkpoint
+		if (previousCheckpointX != nextCheckpointX || previousCheckpointY != nextCheckpointY){
+			
+		}
         
         int thrust = 0;
         if (nextCheckpointAngle > 90 || nextCheckpointAngle < -90 || nextCheckpointDist < 1000){
@@ -81,10 +109,13 @@ int main()
             thrust = 100;
             if (nextCheckpointDist < 1000) thrust = 30;
         }
+		
+		
+		//
+		if (nextCheckpointDist < CHECKPOINT_APPROACH_DIST){
+			
+		}
 
-        // You have to output the target position
-        // followed by the power (0 <= thrust <= 100)
-        // i.e.: "x y thrust"
         cout << nextCheckpointX << " " << nextCheckpointY << " " << thrust << endl;
     }
 }
