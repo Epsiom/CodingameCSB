@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include "math.h";
 
 using namespace std;
 
@@ -16,10 +17,13 @@ const int MAP_HEIGHT = 9000;
 const int MAP_CENTER_X = MAP_WIDTH/2;
 const int MAP_CENTER_Y = MAP_HEIGHT/2;
 const int CHECKPOINT_RADIUS = 600;
-const int POD_RADIUS = 400;	//btw you only pass a checkpoint if the center of the pod is inside the checkpoint, so the pod radius doesn't matter here
+const int POD_RADIUS = 400;	//Important seulement pour les collisions : seul le centre du pod passe les checkpoints
 
 const int CHECKPOINT_BOOST_APPROACH_DIST = 6000;
-const int CHECKPOINT_APPROACH_DIST = 1000;
+const int CHECKPOINT_APPROACH_DIST = 4000;
+const int CHECKPOINT_APPROACH_THRUST = 70;
+
+//TODO : enlever
 const int TURN_APPROACH_MIN = 30;
 
 //(x - (speed.valueX() * 3)
@@ -65,6 +69,34 @@ bool addNewCheckpoint(vector<Checkpoint> checkpointList, Checkpoint currentCheck
 }
 */
 
+class Point {
+    private:
+        int x;
+        int y;
+	public:
+		Point(int t_x, int t_y);
+		bool operator== (const Point& p);
+		double getDistance(const Point& p);
+		int getX() const { return x; }
+		int getY() const { return y; }
+};
+
+Point::Point(int t_x, int t_y) {
+	this->x = t_x;
+	this->y = t_y;
+}
+
+bool Point::operator== (const Point& p) {
+	if (x == p.getX() && y == p.getY()) return true;
+	return false;
+}
+
+double Point::getDistance(const Point& p){
+	int distancex = (p.getX() - x) * (p.getX() - x);
+	int distancey = (p.getY() - y) * (p.getY() - y);
+	return sqrt(distancex + distancey); 
+}
+
 
 
 int main()
@@ -83,6 +115,9 @@ int main()
 	int checkpointNumber = 0;
 	bool isBoostAvailable = true;
 	
+	int previousX = 0;
+	int previousY = 0;
+	
 	
     // game loop
     while (1) {
@@ -97,37 +132,46 @@ int main()
         int opponentY;
         cin >> opponentX >> opponentY; cin.ignore();
 		
-		/*
-		//Le premier tour, ajoute les checkpoint apres leur passage
-        Checkpoint currentCheckpoint (currentCheckpointNumber, nextCheckpointX, nextCheckpointY);
-		if (lapNumber == 0){
-			bool checkpointChanged = addNewCheckpoint(checkpointList, currentCheckpoint, currentCheckpointNumber);
-			if (checkpointChanged){
-				currentCheckpointNumber++;
-				turnsSinceLastCheckpoint = 0;
-			}
-		}
-		*/
-		
-		//Permet temporairement de verifier si on a change de checkpoint
-		if (previousCheckpointX != nextCheckpointX || previousCheckpointY != nextCheckpointY){
-			turnsSinceLastCheckpoint = 0;
-		}
-		
         
         int thrust = 0;
 		int destinationX = nextCheckpointX;
 		int destinationY = nextCheckpointY;
+		
+		int velocityX = x-previousX;
+		int velocityY = y-previousY;
+		int velocity = (int)sqrt(velocityX*velocityX + velocityY*velocityY);
+		
+		Point pod (x, y);
+		Point nextCheckpoint (nextCheckpointX, nextCheckpointY);
+		
+		
+		//Si le checkpoint est derriere nous, on accellere pas, pour ne pas s'en eloigner
         if (nextCheckpointAngle > 90 || nextCheckpointAngle < -90){
             thrust = 0;
         }
 		else{
 			thrust = 100;
-			if (nextCheckpointDist < CHECKPOINT_APPROACH_DIST && turnsSinceLastCheckpoint > 10){
-				thrust = 0;
+			
+			//On ralentit en approchant
+			if (nextCheckpointDist < CHECKPOINT_APPROACH_DIST) {
+				thrust = CHECKPOINT_APPROACH_THRUST;
+			}
+
+
+			//Calcul de la position approximative du tour suivant, pour verifier si on sera dans le checkpoint
+			Point nextPosition(x - 3 * velocityX, y - 3 * velocityY);
+
+			cerr << nextCheckpoint.getDistance(nextPosition) << endl;
+
+			//Si on sait qu'on sera dans le point, on tourne deja vers le centre pour se preparer
+			if (nextCheckpoint.getDistance(nextPosition) < CHECKPOINT_RADIUS) {
+				thrust = 10;
 				destinationX = MAP_CENTER_X;
 				destinationY = MAP_CENTER_Y;
 			}
+			
+			
+			//Si le boost est disponible et qu'on est assez loin, on boost
 			if (isBoostAvailable
 					&& nextCheckpointDist >= CHECKPOINT_BOOST_APPROACH_DIST
 					&& nextCheckpointAngle < 20
@@ -139,11 +183,12 @@ int main()
 		
 		turnsSinceLastCheckpoint++;
 		if (thrust <= 100){
-		    cout << destinationX << " " << destinationY << " " << thrust << endl;
+		    cout << destinationX << " " << destinationY << " " << thrust << " " << thrust << endl;
 		}
 		else{
-			cout << destinationX << " " << destinationY << " " << "BOOST" << endl;
+			cout << destinationX << " " << destinationY << " " << "BOOST BOOST" << endl;
 		}
     }
 }
+
 
