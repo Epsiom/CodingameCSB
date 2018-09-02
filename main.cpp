@@ -20,8 +20,15 @@ const int CHECKPOINT_RADIUS = 600;
 const int POD_RADIUS = 400;	//Important seulement pour les collisions : seul le centre du pod passe les checkpoints
 
 const int CHECKPOINT_BOOST_APPROACH_DIST = 6000;
-const int CHECKPOINT_APPROACH_DIST = 4000;
-const int CHECKPOINT_APPROACH_THRUST = 70;
+
+const int CHECKPOINT_APPROACH_DIST_1 = 1500;
+const int CHECKPOINT_APPROACH_THRUST_1 = 70;
+
+const int CHECKPOINT_APPROACH_DIST_2 = 1300;
+const int CHECKPOINT_APPROACH_THRUST_2 = 50;
+
+const int CHECKPOINT_APPROACH_DIST_3 = 1100;
+const int CHECKPOINT_APPROACH_THRUST_3 = 30;
 
 //TODO : enlever
 const int TURN_APPROACH_MIN = 30;
@@ -152,16 +159,26 @@ int main()
 		else{
 			thrust = 100;
 			
+			
 			//On ralentit en approchant
-			if (nextCheckpointDist < CHECKPOINT_APPROACH_DIST) {
-				thrust = CHECKPOINT_APPROACH_THRUST;
+			if (nextCheckpointDist < CHECKPOINT_APPROACH_DIST_1) {
+				thrust = CHECKPOINT_APPROACH_THRUST_1;
 			}
+			if (nextCheckpointDist < CHECKPOINT_APPROACH_DIST_2) {
+				thrust = CHECKPOINT_APPROACH_THRUST_2;
+			}
+			if (nextCheckpointDist < CHECKPOINT_APPROACH_DIST_3) {
+				thrust = CHECKPOINT_APPROACH_THRUST_3;
+			}
+			
 
 
 			//Calcul de la position approximative du tour suivant, pour verifier si on sera dans le checkpoint
-			Point nextPosition(x - 3 * velocityX, y - 3 * velocityY);
-
-			cerr << nextCheckpoint.getDistance(nextPosition) << endl;
+			Point nextPosition(x + 3 * velocityX, y + 3 * velocityY);
+			
+			cerr << "nextCheckpointX : " << x + 2 * velocityX << endl;
+			cerr << "nextCheckpointY : " << y + 2 * velocityY << endl;
+			cerr << "nextCheckpoint.getDistance(nextPosition) : " << nextCheckpoint.getDistance(nextPosition) << endl;
 
 			//Si on sait qu'on sera dans le point, on tourne deja vers le centre pour se preparer
 			if (nextCheckpoint.getDistance(nextPosition) < CHECKPOINT_RADIUS) {
@@ -182,6 +199,8 @@ int main()
         }
 		
 		turnsSinceLastCheckpoint++;
+		previousX = x;
+		previousY = y;
 		if (thrust <= 100){
 		    cout << destinationX << " " << destinationY << " " << thrust << " " << thrust << endl;
 		}
