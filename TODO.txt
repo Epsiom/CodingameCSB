@@ -71,3 +71,11 @@ Counterbalance 10:43PM
 if you're facing more than 90 deg away from the checkpoint, it's better not to thrust, or you'll move away from the checkpoint, instead of closer
  that's the basic idea
  
+ 
+ 
+ Random search? Plus facile que les algo génétiques.
+ just generate 1000 random arrays of moves for the next 6 turns and pick the best
+ then use my starter:
+ MadKnight : https://github.com/git-knight/mad-starter/blob/master/main.cpp
+ 
+ 

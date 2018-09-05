@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
-#include "math.h";
+#include "math.h"
 
 using namespace std;
 
@@ -18,6 +18,7 @@ const int MAP_CENTER_X = MAP_WIDTH / 2;
 const int MAP_CENTER_Y = MAP_HEIGHT / 2;
 const int CHECKPOINT_RADIUS = 600;
 const int POD_RADIUS = 400;	//Important seulement pour les collisions : seul le centre du pod passe les checkpoints
+const int BOOST_THRUST_VALUE = 650;	//Le boost est une acceleration de 650
 
 const int CHECKPOINT_BOOST_APPROACH_DIST = 6000;
 
@@ -30,8 +31,6 @@ const int CHECKPOINT_APPROACH_THRUST_2 = 50;
 const int CHECKPOINT_APPROACH_DIST_3 = 1100;
 const int CHECKPOINT_APPROACH_THRUST_3 = 30;
 
-//TODO : enlever
-const int TURN_APPROACH_MIN = 30;
 
 //(x - (speed.valueX() * 3)
 //It corrects your aim for centrifugal force
@@ -43,49 +42,15 @@ velocity is (to - cur).normalize() * thrust * friction,
 and friction is 0.85
 */
 
-/*
-class Checkpoint {
-private:
-int number;   //"nom" du checkpoint : 0 est le point de depart
-int x;
-int y;
-public:
-Checkpoint(int t_number, int t_x, int t_y) : number(t_number), x(t_x), y(t_y) {}
-bool operator==(const Checkpoint& a, const Checkpoint& b) {
-if (a.getNumber() == b.getNumber() && a.getX() == b.getX() && a.getY() == b.getY()) return true;
-return false;
-}
-int getNumber() const { return number; }
-int getX() const { return x; }
-int getY() const { return y; }
-};
-
-//Ajoute un nouveau checkpoint a la liste s'il est different du depart et de l'actuel, et retourne alors true dans ce cas
-bool addNewCheckpoint(vector<Checkpoint> checkpointList, Checkpoint currentCheckpoint, int currentCheckpointNumber){
-//TODO: PASSAGES PAR POINTEUR ET ALLOCATION!
-
-//Pas de probleme sur back, qui n'est pas evalue si la liste est vide
-if (checkpointList.empty() || checkpointList.back() != currentCheckpoint){
-
-//TODO: ajouter le depart initialement si la liste est vide
-
-checkpointList.push_back(currentCheckpoint);
-return true;
-}
-return false;
-}
-*/
 
 class Point {
-private:
-	int x;
-	int y;
 public:
+	int x, y;
 	Point(int t_x, int t_y);
 	bool operator== (const Point& p);
-	double getDistance(const Point& p);
-	int getX() const { return x; }
-	int getY() const { return y; }
+	float distance(const Point& p);
+	float distance2(const Point& p);
+	Point closest(const Point& a, const Point& b);
 };
 
 Point::Point(int t_x, int t_y) {
@@ -94,15 +59,176 @@ Point::Point(int t_x, int t_y) {
 }
 
 bool Point::operator== (const Point& p) {
-	if (x == p.getX() && y == p.getY()) return true;
+	if (x == p.x && y == p.y) return true;
 	return false;
 }
 
-double Point::getDistance(const Point& p) {
-	int distancex = (p.getX() - x) * (p.getX() - x);
-	int distancey = (p.getY() - y) * (p.getY() - y);
-	return sqrt(distancex + distancey);
+float Point::distance(const Point& p) {
+    return sqrt(this->distance2(p));
 }
+
+//Evite d'utiliser sqrt si on veut le carre de la distance
+float Point::distance2(const Point& p) {
+    return (this->x - p.x)*(this->x - p.x) + (this->y - p.y)*(this->y - p.y);
+}
+
+Point Point::closest(const Point& a, const Point& b){
+	float da = b.y - a.y;
+    float db = a.x - b.x;
+    float c1 = da*a.x + db*a.y;
+    float c2 = -db*this->x + da*this->y;
+    float det = da*da + db*db;
+    float cx = 0;
+    float cy = 0;
+
+    if (det != 0) {
+        cx = (da*c1 - db*c2) / det;
+        cy = (da*c2 + db*c1) / det;
+    } else {
+        // The point is already on the line
+        cx = this->x;
+        cy = this->y;
+    }
+
+    return new Point(cx, cy);
+}
+
+
+
+class Unit : public Point{
+public:
+	int id;
+	float r, vx, vy;
+};
+
+
+
+class Pod : public Unit{
+public:
+	float angle;	//(0:est, 90:sud, 180:ouest, 270:nord)
+	int nextCheckpointId;
+	int checked;	//TODO: a comprendre
+	int timeout;	//100 tours sans passer de checkpoint = elimination
+	Pod partner;
+	bool shield;	//Le shield est active 3 tours
+	float getAngle(const Point& p);
+	float diffAngle(const Point& p);
+	void rotate(const Point& p);
+	void boost(int thrust);
+	void move(float t);
+};
+
+//Retourne l'angle (0-359) d'un vecteur fait entre les deux points (0:est, 90:sud, 180:ouest, 270:nord)
+float Pod::getAngle(const Point& p) {
+    float d = this->distance(p);
+    float dx = (p->x - this->x) / d;
+    float dy = (p->y - this->y) / d;
+
+    // Simple trigonometry. We multiply by 180.0 / PI to convert radiants to degrees.
+    float a = acos(dx) * 180.0 / PI;
+
+    // If the point I want is below me, I have to shift the angle for it to be correct
+    if (dy < 0) {
+        a = 360.0 - a;
+    }
+
+    return a;
+}
+
+//Retourne la rotation a effectuer pour faire face au point p (-180(gauche) a 180(droite))
+float Pod::diffAngle(const Point& p) {
+    float a = this->getAngle(p);
+
+    // To know whether we should turn clockwise or not we look at the two ways and keep the smallest
+    // The ternary operators replace the use of a modulo operator which would be slower
+    float right = this->angle <= a ? a - this->angle : 360.0 - this->angle + a;
+    float left = this->angle >= a ? this->angle - a : this->angle + 360.0 - a;
+
+    if (right < left) {
+        return right;
+    } else {
+        // We return a negative angle if we must rotate to left
+        return -left;
+    }
+}
+
+//Permet d'effectuer la rotation du pod pour faire face au point p
+//en prenant en compte la limite de rotation de 18 degres par tour
+void Pod::rotate(const Point& p) {
+    float a = this->diffAngle(p);
+
+    // Can't turn by more than 18 degrees in one turn
+    if (a > 18.0) {
+        a = 18.0;
+    } else if (a < -18.0) {
+        a = -18.0;
+    }
+
+    this->angle += a;
+
+    // The % operator is slow. If we can avoid it, it s better.
+    if (this->angle >= 360.0) {
+        this->angle = this->angle - 360.0;
+    } else if (this->angle < 0.0) {
+        this->angle += 360.0;
+    }
+}
+
+//Augmente la vitesse du pod selon la poussee (Le boost est une accelleration de 650)
+void Pod::boost(int thrust) {
+	// Don't forget that a pod which has activated its shield cannot accelerate for 3 turns
+    if (this->shield) {
+        return;
+    }
+
+    // Conversion of the angle to radiants
+    float ra = this->angle * PI / 180.0;
+
+    // Trigonometry
+    this->vx += cos(ra) * thrust;
+    this->vy += sin(ra) * thrust;
+}
+
+//Change la position du pod selon sa vitesse (t est le temps. t=1 pour effectuer un tour de jeu entier)
+//t est ici utile pour calculer les collisions qui se produisent pendant le tour
+void Pod::move(float t) {
+    this->x += this->vx * t;
+    this->y += this->vy * t;
+}
+
+//Retourne la troncature de la valeur (evite d'arrondir a l'inferieur les negatifs)
+float truncate(float value){
+	if (value >= 0) return floor(value);
+	//Sinon, si la valeur est negative
+	return ceil(value);
+}
+
+//Applique la friction et tronque les valeurs
+void end() {
+    this.x = round(this->x);
+    this.y = round(this->y);
+    this.vx = truncate(this->vx * 0.85);
+    this.vy = truncate(this->vy * 0.85);
+
+    // Don't forget that the timeout goes down by 1 each turn. It is reset to 100 when you pass a checkpoint
+    this.timeout -= 1;
+}
+
+//Permet de simuler les deplacement d un tour entier
+void play(const Point& p, int thrust) {
+    this.rotate(p);
+    this.boost(thrust);
+    this.move(1.0);
+    this.end();
+}
+
+
+
+/*
+class Checkpoint : public Unit{
+public:
+	
+};*/
 
 
 
@@ -178,7 +304,7 @@ int main()
 
 			cerr << "nextCheckpointX : " << x + 2 * velocityX << endl;
 			cerr << "nextCheckpointY : " << y + 2 * velocityY << endl;
-			cerr << "nextCheckpoint.getDistance(nextPosition) : " << nextCheckpoint.getDistance(nextPosition) << endl;
+			cerr << "nextCheckpoint.getDistance(nextPosition) : " << nextCheckpoint.distance(nextPosition) << endl;
 
 			//Si on sait qu'on sera dans le point, on tourne deja vers le centre pour se preparer
 			if (nextCheckpoint.getDistance(nextPosition) < CHECKPOINT_RADIUS) {
