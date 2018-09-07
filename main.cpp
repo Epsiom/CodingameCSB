@@ -31,16 +31,9 @@ const int CHECKPOINT_APPROACH_THRUST_2 = 50;
 const int CHECKPOINT_APPROACH_DIST_3 = 1100;
 const int CHECKPOINT_APPROACH_THRUST_3 = 30;
 
+const float PI = 3.14159;
 
-//(x - (speed.valueX() * 3)
-//It corrects your aim for centrifugal force
 
-/*
-rotation is limited to +/- 18 deg,
-accelleration is ignored,
-velocity is (to - cur).normalize() * thrust * friction,
-and friction is 0.85
-*/
 
 //Retourne la troncature de la valeur (evite d'arrondir a l'inferieur les negatifs)
 float truncate(float value){
@@ -56,12 +49,18 @@ float truncate(float value){
 class Point {
 public:
 	int x, y;
+	Point();
 	Point(int t_x, int t_y);
 	bool operator== (const Point& p);
 	float distance(const Point& p);
 	float distance2(const Point& p);
-	Point closest(const Point& a, const Point& b);
+	Point* closest(const Point& a, const Point& b);
 };
+
+Point::Point(){
+    this->x = 0;
+    this->y =0;
+}
 
 Point::Point(int t_x, int t_y) {
 	this->x = t_x;
@@ -83,7 +82,7 @@ float Point::distance2(const Point& p) {
 }
 
 //Retourne le point (tangente) le plus proche entre ce point et la droite (a;b)
-Point Point::closest(const Point& a, const Point& b){
+Point* Point::closest(const Point& a, const Point& b){
 	float da = b.y - a.y;
     float db = a.x - b.x;
     float c1 = da*a.x + db*a.y;
@@ -112,19 +111,30 @@ class Unit : public Point{
 public:
 	int id;
 	float r, vx, vy;
-	Collision collision(Unit u);
-	void bounce(Unit u);
+	Unit ();
+	//Collision* collision(Unit u);
+	//void bounce(Unit u);
 };
 
+Unit::Unit (){
+    this->x = 0;
+    this->y = 0;
+    this->id = 0;
+    this->r = 0;
+    this->vx = 0;
+    this->vy = 0;
+}
+
+/*
 //Cherche et retourne la potentielle collision effectuee avec une autre unite (null sinon)
 //TODO: temps reel? Dixiemes de tours de rotation max 1.8 ?
 //TODO: COLLISIONS AVEC UN CHECKPOINT A REVOIR: LE CENTRE DOIT PASSER DANS LE RAYON, PAS DE CONTACT DE RADIUS!
-Collision Unit::collision(Unit u) {
+Collision* Unit::collision(Unit u) {
     // Square of the distance
-    float dist = this.distance2(u);
+    float dist = this->distance2(u);
 
     // Sum of the radii squared
-    float sr = (this.r + u.r)*(this.r + u.r);
+    float sr = (this->r + u.r)*(this->r + u.r);
 
     // We take everything squared to avoid calling sqrt uselessly. It is better for performances
 
@@ -135,16 +145,16 @@ Collision Unit::collision(Unit u) {
 
 	//TODO: ameliorer (vitesse plus faible que u en etant derriere, ou vitesses d'angles > 90)
     // Optimisation. Objects with the same speed will never collide
-    if (this.vx == u.vx && this.vy == u.vy) {
+    if (this->vx == u.vx && this->vy == u.vy) {
         return null;
     }
 
     // We place ourselves in the reference frame of u. u is therefore stationary and is at (0,0)
-    float x = this.x - u.x;
-    float y = this.y - u.y;
+    float x = this->x - u.x;
+    float y = this->y - u.y;
     Point myp = new Point(x, y);
-    float vx = this.vx - u.vx;
-    float vy = this.vy - u.vy;
+    float vx = this->vx - u.vx;
+    float vy = this->vy - u.vy;
     Point up = new Point(0, 0)
 
     // We look for the closest point to u (which is in (0,0)) on the line described by our speed vector
@@ -181,7 +191,7 @@ Collision Unit::collision(Unit u) {
         // Time needed to reach the impact point
         float t = pdist / length;
 
-        return new Collision(this, u, t);
+        return new Collision(this, &u, t);
     }
 
     return null;
@@ -236,6 +246,27 @@ void Unit::bounce(Unit u) {
         // But this place is called so often that I can't pay a performance price to make it more readable.
     }
 }
+*/
+
+
+//-------------------------------------------------------------------------------------
+
+/*
+//TODO: declarer plus haut?
+class Collision{
+	public:
+		Unit* a;
+		Unit* b;
+		float t; //Temps pendant le tour (compris entre 0.0 et 1.0)
+		Collision (Unit* t_a, Unit* t_b, float t_t);
+}
+
+Collision::Collision (Unit* t_a, Unit* t_b, float t_t){
+	this->a = t_a;
+	this->b = t_b;
+	this->t = t_t;
+}
+*/
 
 
 //-------------------------------------------------------------------------------------
@@ -251,6 +282,7 @@ public:
 	bool shield;	//Le shield est actif 3 tours
 	Pod (int t_id);
 	Pod (float t_x, float t_y, int t_id, float t_vx, float t_vy, float t_angle, int t_nextCheckpointId, int t_checked, int t_timeout, Pod* t_partner, bool t_shield);
+	void update(float pod_x, float pod_y, float pod_vx, float pod_vy, float pod_angle, int pod_nextCheckPointId);
 	float getAngle(const Point& p);
 	float diffAngle(const Point& p);
 	void rotate(const Point& p);
@@ -273,7 +305,7 @@ Pod::Pod (int t_id){
 	this->nextCheckpointId = 1;
 	this->checked = 0;
 	this->timeout = 100;
-	this->partner = null;
+	this->partner = nullptr;
 	this->shield = false;
 }
 
@@ -294,11 +326,20 @@ Pod::Pod (float t_x, float t_y, int t_id, float t_vx, float t_vy, float t_angle,
 	this->shield = t_shield;
 }
 
+void Pod::update(float pod_x, float pod_y, float pod_vx, float pod_vy, float pod_angle, int pod_nextCheckPointId){
+    this->x = pod_x;
+	this->y = pod_y;
+	this->vx = pod_vx;
+	this->vy = pod_vy;
+	this->angle = pod_angle;
+	this->nextCheckpointId = pod_nextCheckPointId;
+}
+
 //Retourne l'angle (0-359) d'un vecteur fait entre les deux points (0:est, 90:sud, 180:ouest, 270:nord)
 float Pod::getAngle(const Point& p) {
     float d = this->distance(p);
-    float dx = (p->x - this->x) / d;
-    float dy = (p->y - this->y) / d;
+    float dx = (p.x - this->x) / d;
+    float dy = (p.y - this->y) / d;
 
     // Simple trigonometry. We multiply by 180.0 / PI to convert radiants to degrees.
     float a = acos(dx) * 180.0 / PI;
@@ -374,52 +415,33 @@ void Pod::move(float t) {
 
 //Applique la friction et tronque les valeurs
 void Pod::end() {
-    this.x = round(this->x);
-    this.y = round(this->y);
-    this.vx = truncate(this->vx * 0.85);
-    this.vy = truncate(this->vy * 0.85);
+    this->x = round(this->x);
+    this->y = round(this->y);
+    this->vx = truncate(this->vx * 0.85);
+    this->vy = truncate(this->vy * 0.85);
 
     // Don't forget that the timeout goes down by 1 each turn. It is reset to 100 when you pass a checkpoint
-    this.timeout -= 1;
+    this->timeout -= 1;
 }
 
 //Permet de simuler les deplacement d un tour entier
 void Pod::play(const Point& p, int thrust) {
-    this.rotate(p);
-    this.boost(thrust);
-    this.move(1.0);
-    this.end();
+    this->rotate(p);
+    this->boost(thrust);
+    this->move(1.0);
+    this->end();
 }
 
 
-//-------------------------------------------------------------------------------------
 
-
-//TODO: declarer plus haut?
-class Collision{
-	public:
-		Unit* a;
-		Unit* b;
-		float t; //Temps pendant le tour (compris entre 0.0 et 1.0)
-		Collision (Unit* t_a, Unit* t_b, float t_t);
-}
-
-Collision::Collision (Unit* t_a, Unit* t_b, float t_t){
-	this->a = t_a;
-	this->b = t_b;
-	this->t = t_t;
-}
-
-
-//-------------------------------------------------------------------------------------
 
 
 class Checkpoint : public Unit{
 public:
 	Checkpoint (float t_x, float t_y, int t_id);
-}
+};
 
-Checkpoint (float t_x, float t_y, int t_id){
+Checkpoint::Checkpoint (float t_x, float t_y, int t_id){
 	this->x = t_x;
 	this->y = t_y;
 	
@@ -468,23 +490,14 @@ int main()
 	
 	// game loop
 	while (1) {
-		/*
-		int ally1_x, ally1_y, ally1_vx, ally1_vy, ally1_angle, ally1_nextCheckPointId;
-		int ally2_x, ally2_y, ally2_vx, ally2_vy, ally2_angle, ally2_nextCheckPointId;
-		int ennemy1_x, ennemy1_y, ennemy1_vx, ennemy1_vy, ennemy1_angle, ennemy1_nextCheckPointId;
-		int ennemy2_x, ennemy2_y, ennemy2_vx, ennemy2_vy, ennemy2_angle, ennemy2_nextCheckPointId;
 		
-		
-		cin >> ally1_x >> ally1_y >> ally1_vx >> ally1_vy >> ally1_angle >> ally1_nextCheckPointId >> cin.ignore();
-		cin >> ally2_x >> ally2_y >> ally2_vx >> ally2_vy >> ally2_angle >> ally2_nextCheckPointId >> cin.ignore();
-		cin >> ennemy1_x >> ennemy1_y >> ennemy1_vx >> ennemy1_vy >> ennemy1_angle >> ennemy1_nextCheckPointId >> cin.ignore();
-		cin >> ennemy2_x >> ennemy2_y >> ennemy2_vx >> ennemy2_vy >> ennemy2_angle >> ennemy2_nextCheckPointId >> cin.ignore();
-		*/
-		
-		//Initialisation des pods
+		//Mise a jour des attributs des pods pour ce tour
 		for (int i=0; i<4; i++){
 			Pod* pod = podList[i];
-			cin >> pod->x >> pod->y >> pod->vx >> pod->vy >> pod->angle >> pod->nextCheckpointId >> cin.ignore();
+			int pod_x, pod_y, pod_vx, pod_vy, pod_angle, pod_nextCheckPointId;
+			cin >> pod_x >> pod_y >> pod_vx >> pod_vy >> pod_angle >> pod_nextCheckPointId; cin.ignore();
+			
+			pod->update(pod_x, pod_y, pod_vx, pod_vy, pod_angle, pod_nextCheckPointId);
 			pod->timeout = pod->timeout-1;
 		}
 		
@@ -492,11 +505,11 @@ int main()
 		for (int podNumber = 0; podNumber<2; podNumber++){
 			Pod* pod = podList[podNumber];
 			Checkpoint* nextCheckpoint = checkpointList[pod->nextCheckpointId];
-			Point nextCheckpointCoords = new Point(nextCheckpoint->x, nextCheckpoint->y);
+			Point* nextCheckpointCoords = new Point(nextCheckpoint->x, nextCheckpoint->y);
 			
 			
-			int distTowardCheckpoint = pod->distance(nextCheckpointCoords);
-			int diffAngleTowardCheckpoint = pod->diffAngle(nextCheckpointCoords);
+			int distTowardCheckpoint = pod->distance(*nextCheckpointCoords);
+			int diffAngleTowardCheckpoint = pod->diffAngle(*nextCheckpointCoords);
 			
 			int newAngle = pod->angle + diffAngleTowardCheckpoint;
 			if (newAngle >= 360.0) {
@@ -505,7 +518,7 @@ int main()
 				newAngle += 360.0;
 			}
 			//Passage en radian
-			newAngle = newAngle * 3.14 / 180.0;
+			newAngle = newAngle * PI / 180.0;
 			//Recuperation d'un point eloigne situe dans la bonne direction
 			float angleTargetX = pod->x + cos(newAngle) * 10000.0;
 			float angleTargetY = pod->y + sin(newAngle) * 10000.0;
@@ -518,6 +531,8 @@ int main()
 				thrust = 0;
 			}
 			else {
+				thrust = 100;
+				
 				//On ralentit en approchant
 				if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_1) {
 					thrust = CHECKPOINT_APPROACH_THRUST_1;
