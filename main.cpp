@@ -249,7 +249,8 @@ public:
 	int timeout;	//100 tours sans passer de checkpoint = elimination
 	Pod* partner;
 	bool shield;	//Le shield est actif 3 tours
-	Pod (float t_x, float t_y, int t_id, float t_r, float t_vx, float t_vy, float t_angle, int t_nextCheckpointId, int t_checked, int t_timeout, Pod* t_partner, bool t_shield);
+	Pod (int t_id);
+	Pod (float t_x, float t_y, int t_id, float t_vx, float t_vy, float t_angle, int t_nextCheckpointId, int t_checked, int t_timeout, Pod* t_partner, bool t_shield);
 	float getAngle(const Point& p);
 	float diffAngle(const Point& p);
 	void rotate(const Point& p);
@@ -259,12 +260,29 @@ public:
 	void play(const Point& p, int thrust);
 };
 
-Pod::Pod (float t_x, float t_y, int t_id, float t_r, float t_vx, float t_vy, float t_angle, int t_nextCheckpointId, int t_checked, int t_timeout, Pod* t_partner, bool t_shield){
+Pod::Pod (int t_id){
+	this->x = 0;
+	this->y = 0;
+	
+	this->id = t_id;
+	this->r = POD_RADIUS;
+	this->vx = 0;
+	this->vy = 0;
+	
+	this->angle = 0;
+	this->nextCheckpointId = 1;
+	this->checked = 0;
+	this->timeout = 100;
+	this->partner = null;
+	this->shield = false;
+}
+
+Pod::Pod (float t_x, float t_y, int t_id, float t_vx, float t_vy, float t_angle, int t_nextCheckpointId, int t_checked, int t_timeout, Pod* t_partner, bool t_shield){
 	this->x = t_x;
 	this->y = t_y;
 	
 	this->id = t_id;
-	this->r = t_r;
+	this->r = POD_RADIUS;
 	this->vx = t_vx;
 	this->vy = t_vy;
 	
@@ -420,21 +438,9 @@ Checkpoint (float t_x, float t_y, int t_id){
 
 int main()
 {
-
-	//Permet temporairement de verifier si on a change de checkpoint
-	//TODO: retirer
-	int previousCheckpointX = -1;
-	int previousCheckpointY = -1;
-	int turnsSinceLastCheckpoint = 0;
-	int checkpointNumber = 0;
-	bool isBoostAvailable = true;
-
-	int previousX = 0;
-	int previousY = 0;
-	
 	//Initialisation des inputs
-	int laps;				//the number of laps to complete the race.
-	int checkpointCount; 	//the number of checkpoints in the circuit
+	int laps;										//the number of laps to complete the race
+	int checkpointCount; 							//the number of checkpoints in the circuit
 	cin >> laps >> checkpointCount; cin.ignore();
 	
 	Checkpoint* checkpointList [checkpointCount];
@@ -444,33 +450,47 @@ int main()
 		checkpointList[i] = new Checkpoint (cx, cy, i);
 	}
 
+	//Instanciation des pods
+	Pod* podList [4];	//0 et 1 sont mes pods, 2 et 3 sont les ennemis
+	for (int i=0; i<4; i++){
+		podList[i] = new Pod(i);
+	}
+	podList[0]->partner = podList[1];
+	podList[1]->partner = podList[0];
+	podList[2]->partner = podList[3];
+	podList[3]->partner = podList[2];
 
+	bool isBoostAvailable = true;
+	int turn = 0;
+	
 	
 	// game loop
 	while (1) {
-		int x;
-		int y;
-		int nextCheckpointX; // x position of the next check point
-		int nextCheckpointY; // y position of the next check point
-		int nextCheckpointDist; // distance to the next checkpoint
-		int nextCheckpointAngle; // angle between your pod orientation and the direction of the next checkpoint
-		cin >> x >> y >> nextCheckpointX >> nextCheckpointY >> nextCheckpointDist >> nextCheckpointAngle; cin.ignore();
-		int opponentX;
-		int opponentY;
-		cin >> opponentX >> opponentY; cin.ignore();
-
-
+		/*
+		int ally1_x, ally1_y, ally1_vx, ally1_vy, ally1_angle, ally1_nextCheckPointId;
+		int ally2_x, ally2_y, ally2_vx, ally2_vy, ally2_angle, ally2_nextCheckPointId;
+		int ennemy1_x, ennemy1_y, ennemy1_vx, ennemy1_vy, ennemy1_angle, ennemy1_nextCheckPointId;
+		int ennemy2_x, ennemy2_y, ennemy2_vx, ennemy2_vy, ennemy2_angle, ennemy2_nextCheckPointId;
+		
+		
+		cin >> ally1_x >> ally1_y >> ally1_vx >> ally1_vy >> ally1_angle >> ally1_nextCheckPointId >> cin.ignore();
+		cin >> ally2_x >> ally2_y >> ally2_vx >> ally2_vy >> ally2_angle >> ally2_nextCheckPointId >> cin.ignore();
+		cin >> ennemy1_x >> ennemy1_y >> ennemy1_vx >> ennemy1_vy >> ennemy1_angle >> ennemy1_nextCheckPointId >> cin.ignore();
+		cin >> ennemy2_x >> ennemy2_y >> ennemy2_vx >> ennemy2_vy >> ennemy2_angle >> ennemy2_nextCheckPointId >> cin.ignore();
+		*/
+		
+		//Initialisation des pods
+		for (int i=0; i<4; i++){
+			Pod* pod = podList[i];
+			cin >> pod->x >> pod->y >> pod->vx >> pod->vy >> pod->angle >> pod->nextCheckpointId >> cin.ignore();
+			pod->timeout = pod->timeout-1;
+		}
+		
+		
+		
+		
+		/*
 		int thrust = 0;
-		int destinationX = nextCheckpointX;
-		int destinationY = nextCheckpointY;
-
-		int velocityX = x - previousX;
-		int velocityY = y - previousY;
-		int velocity = (int)sqrt(velocityX*velocityX + velocityY * velocityY);
-
-		Point pod(x, y);
-		Point nextCheckpoint(nextCheckpointX, nextCheckpointY);
-
 
 		//Si le checkpoint est derriere nous, on accellere pas, pour ne pas s'en eloigner
 		if (nextCheckpointAngle > 90 || nextCheckpointAngle < -90) {
@@ -528,10 +548,7 @@ int main()
 		if (thrust < 0) {
 			cout << destinationX << " " << destinationY << " " << "SHIELD SHIELD" << endl;
 		}
-
-		turnsSinceLastCheckpoint++;
-		previousX = x;
-		previousY = y;
-
+		*/
+		turn++;
 	}
 }
