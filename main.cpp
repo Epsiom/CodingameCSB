@@ -42,6 +42,16 @@ velocity is (to - cur).normalize() * thrust * friction,
 and friction is 0.85
 */
 
+//Retourne la troncature de la valeur (evite d'arrondir a l'inferieur les negatifs)
+float truncate(float value){
+	if (value >= 0) return floor(value);
+	//Sinon, si la valeur est negative
+	return ceil(value);
+}
+
+
+//-------------------------------------------------------------------------------------
+
 
 class Point {
 public:
@@ -72,6 +82,7 @@ float Point::distance2(const Point& p) {
     return (this->x - p.x)*(this->x - p.x) + (this->y - p.y)*(this->y - p.y);
 }
 
+//Retourne le point (tangente) le plus proche entre ce point et la droite (a;b)
 Point Point::closest(const Point& a, const Point& b){
 	float da = b.y - a.y;
     float db = a.x - b.x;
@@ -94,13 +105,140 @@ Point Point::closest(const Point& a, const Point& b){
 }
 
 
+//-------------------------------------------------------------------------------------
+
 
 class Unit : public Point{
 public:
 	int id;
 	float r, vx, vy;
+	Collision collision(Unit u);
+	void bounce(Unit u);
 };
 
+//Cherche et retourne la potentielle collision effectuee avec une autre unite (null sinon)
+//TODO: temps reel? Dixiemes de tours de rotation max 1.8 ?
+//TODO: COLLISIONS AVEC UN CHECKPOINT A REVOIR: LE CENTRE DOIT PASSER DANS LE RAYON, PAS DE CONTACT DE RADIUS!
+Collision Unit::collision(Unit u) {
+    // Square of the distance
+    float dist = this.distance2(u);
+
+    // Sum of the radii squared
+    float sr = (this.r + u.r)*(this.r + u.r);
+
+    // We take everything squared to avoid calling sqrt uselessly. It is better for performances
+
+    if (dist < sr) {
+        // Objects are already touching each other. We have an immediate collision.
+        return new Collision(this, u, 0.0);
+    }
+
+	//TODO: ameliorer (vitesse plus faible que u en etant derriere, ou vitesses d'angles > 90)
+    // Optimisation. Objects with the same speed will never collide
+    if (this.vx == u.vx && this.vy == u.vy) {
+        return null;
+    }
+
+    // We place ourselves in the reference frame of u. u is therefore stationary and is at (0,0)
+    float x = this.x - u.x;
+    float y = this.y - u.y;
+    Point myp = new Point(x, y);
+    float vx = this.vx - u.vx;
+    float vy = this.vy - u.vy;
+    Point up = new Point(0, 0)
+
+    // We look for the closest point to u (which is in (0,0)) on the line described by our speed vector
+    Point p = up.closest(myp, new Point(x + vx, y + vy));
+
+    // Square of the distance between u and the closest point to u on the line described by our speed vector
+    float pdist = up.distance2(p);
+
+    // Square of the distance between us and that point
+    float mypdist = myp.distance2(p);
+
+    // If the distance between u and this line is less than the sum of the radii, there might be a collision
+    if (pdist < sr) {
+     // Our speed on the line
+        float length = sqrt(vx*vx + vy*vy);
+
+        // We move along the line to find the point of impact
+        float backdist = sqrt(sr - pdist);
+        p.x = p.x - backdist * (vx / length);
+        p.y = p.y - backdist * (vy / length);
+
+        // If the point is now further away it means we are not going the right way, therefore the collision won't happen
+        if (myp.distance2(p) > mypdist) {
+            return null;
+        }
+
+        pdist = p.distance(myp);
+
+        // The point of impact is further than what we can travel in one turn
+        if (pdist > length) {
+            return null;
+        }
+
+        // Time needed to reach the impact point
+        float t = pdist / length;
+
+        return new Collision(this, u, t);
+    }
+
+    return null;
+}
+
+//Calcul du rebond apres une collision (dans le cas d'un checkpoint, il est nul)
+//TODO: COLLISIONS AVEC UN CHECKPOINT A REVOIR: LE CENTRE DOIT PASSER DANS LE RAYON, PAS DE CONTACT DE RADIUS!
+void Unit::bounce(Unit u) {
+    if (u instanceof Checkpoint) {
+        // Collision with a checkpoint
+        this.bounceWithCheckpoint((Checkpoint) u);
+    } else {
+        // If a pod has its shield active its mass is 10 otherwise it's 1
+        float m1 = this.shield ? 10 : 1;
+        float m2 = u.shield ? 10 : 1;
+        float mcoeff = (m1 + m2) / (m1 * m2);
+
+        float nx = this.x - u.x;
+        float ny = this.y - u.y;
+
+        // Square of the distance between the 2 pods. This value could be hardcoded because it is always 800²
+        float nxnysquare = nx*nx + ny*ny;
+
+        float dvx = this.vx - u.vx;
+        float dvy = this.vy - u.vy;
+
+        // fx and fy are the components of the impact vector. product is just there for optimisation purposes
+        float product = nx*dvx + ny*dvy;
+        float fx = (nx * product) / (nxnysquare * mcoeff);
+        float fy = (ny * product) / (nxnysquare * mcoeff);
+
+        // We apply the impact vector once
+        this.vx -= fx / m1;
+        this.vy -= fy / m1;
+        u.vx += fx / m2;
+        u.vy += fy / m2;
+
+        // If the norm of the impact vector is less than 120, we normalize it to 120
+        float impulse = sqrt(fx*fx + fy*fy);
+        if (impulse < 120.0) {
+            fx = fx * 120.0 / impulse;
+            fy = fy * 120.0 / impulse;
+        }
+
+        // We apply the impact vector a second time
+        this.vx -= fx / m1;
+        this.vy -= fy / m1;
+        u.vx += fx / m2;
+        u.vy += fy / m2;
+
+        // This is one of the rare places where a Vector class would have made the code more readable.
+        // But this place is called so often that I can't pay a performance price to make it more readable.
+    }
+}
+
+
+//-------------------------------------------------------------------------------------
 
 
 class Pod : public Unit{
@@ -109,14 +247,34 @@ public:
 	int nextCheckpointId;
 	int checked;	//TODO: a comprendre
 	int timeout;	//100 tours sans passer de checkpoint = elimination
-	Pod partner;
-	bool shield;	//Le shield est active 3 tours
+	Pod* partner;
+	bool shield;	//Le shield est actif 3 tours
+	Pod (float t_x, float t_y, int t_id, float t_r, float t_vx, float t_vy, float t_angle, int t_nextCheckpointId, int t_checked, int t_timeout, Pod* t_partner, bool t_shield);
 	float getAngle(const Point& p);
 	float diffAngle(const Point& p);
 	void rotate(const Point& p);
 	void boost(int thrust);
 	void move(float t);
+	void end();
+	void play(const Point& p, int thrust);
 };
+
+Pod::Pod (float t_x, float t_y, int t_id, float t_r, float t_vx, float t_vy, float t_angle, int t_nextCheckpointId, int t_checked, int t_timeout, Pod* t_partner, bool t_shield){
+	this->x = t_x;
+	this->y = t_y;
+	
+	this->id = t_id;
+	this->r = t_r;
+	this->vx = t_vx;
+	this->vy = t_vy;
+	
+	this->angle = t_angle;
+	this->nextCheckpointId = t_nextCheckpointId;
+	this->checked = t_checked;
+	this->timeout = t_timeout;
+	this->partner = t_partner;
+	this->shield = t_shield;
+}
 
 //Retourne l'angle (0-359) d'un vecteur fait entre les deux points (0:est, 90:sud, 180:ouest, 270:nord)
 float Pod::getAngle(const Point& p) {
@@ -196,15 +354,8 @@ void Pod::move(float t) {
     this->y += this->vy * t;
 }
 
-//Retourne la troncature de la valeur (evite d'arrondir a l'inferieur les negatifs)
-float truncate(float value){
-	if (value >= 0) return floor(value);
-	//Sinon, si la valeur est negative
-	return ceil(value);
-}
-
 //Applique la friction et tronque les valeurs
-void end() {
+void Pod::end() {
     this.x = round(this->x);
     this.y = round(this->y);
     this.vx = truncate(this->vx * 0.85);
@@ -215,7 +366,7 @@ void end() {
 }
 
 //Permet de simuler les deplacement d un tour entier
-void play(const Point& p, int thrust) {
+void Pod::play(const Point& p, int thrust) {
     this.rotate(p);
     this.boost(thrust);
     this.move(1.0);
@@ -223,25 +374,55 @@ void play(const Point& p, int thrust) {
 }
 
 
+//-------------------------------------------------------------------------------------
 
-/*
+
+//TODO: declarer plus haut?
+class Collision{
+	public:
+		Unit* a;
+		Unit* b;
+		float t; //Temps pendant le tour (compris entre 0.0 et 1.0)
+		Collision (Unit* t_a, Unit* t_b, float t_t);
+}
+
+Collision::Collision (Unit* t_a, Unit* t_b, float t_t){
+	this->a = t_a;
+	this->b = t_b;
+	this->t = t_t;
+}
+
+
+//-------------------------------------------------------------------------------------
+
+
 class Checkpoint : public Unit{
 public:
+	Checkpoint (float t_x, float t_y, int t_id);
+}
+
+Checkpoint (float t_x, float t_y, int t_id){
+	this->x = t_x;
+	this->y = t_y;
 	
-};*/
+	this->id = t_id;
+	this->r = CHECKPOINT_RADIUS;
+	this->vx = 0;
+	this->vy = 0;
+}
+
+
+
+//-------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------
 
 
 
 int main()
 {
 
-	/*
-	vector<Checkpoint> checkpointList;
-	int lapNumber = 0;
-
-	*/
-
 	//Permet temporairement de verifier si on a change de checkpoint
+	//TODO: retirer
 	int previousCheckpointX = -1;
 	int previousCheckpointY = -1;
 	int turnsSinceLastCheckpoint = 0;
@@ -250,8 +431,21 @@ int main()
 
 	int previousX = 0;
 	int previousY = 0;
+	
+	//Initialisation des inputs
+	int laps;				//the number of laps to complete the race.
+	int checkpointCount; 	//the number of checkpoints in the circuit
+	cin >> laps >> checkpointCount; cin.ignore();
+	
+	Checkpoint* checkpointList [checkpointCount];
+	for (int i=0; i<checkpointCount; i++){
+		int cx, cy;
+		cin >> cx >> cy; cin.ignore();
+		checkpointList[i] = new Checkpoint (cx, cy, i);
+	}
 
 
+	
 	// game loop
 	while (1) {
 		int x;
