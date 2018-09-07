@@ -517,6 +517,9 @@ int main()
 			} else if (newAngle < 0.0) {
 				newAngle += 360.0;
 			}
+			cerr << "newAngle: " << newAngle << endl;
+			
+			/*
 			//Passage en radian
 			newAngle = newAngle * PI / 180.0;
 			//Recuperation d'un point eloigne situe dans la bonne direction
@@ -524,6 +527,10 @@ int main()
 			float angleTargetY = pod->y + sin(newAngle) * 10000.0;
 			destinationX = angleTargetX;
 			destinationY = angleTargetY;
+			*/
+			destinationX = nextCheckpoint->x;
+			destinationY = nextCheckpoint->y;
+			
 			
 			thrust = 0;
 			//Si le checkpoint est derriere nous, on accellere pas, pour ne pas s'en eloigner
@@ -555,7 +562,9 @@ int main()
 				
 				//TODO: Evidemment temporaire pour tester
 				//Si on pense avoir le checkpoint
-				if ( (diffAngleTowardCheckpoint < 45 || diffAngleTowardCheckpoint > -45) && distTowardCheckpoint < CHECKPOINT_RADIUS*3) {
+				Point threeTurnVaguePrediction (pod->x+3*pod->vx, pod->y+3*pod->vy);
+				
+				if (threeTurnVaguePrediction.distance(*nextCheckpointCoords) < CHECKPOINT_RADIUS) {
 					int otherCheckpointId = pod->nextCheckpointId + 1;
 					if (otherCheckpointId >= checkpointCount) otherCheckpointId = 0;
 					Checkpoint* otherCheckpoint = checkpointList[otherCheckpointId];
@@ -564,10 +573,11 @@ int main()
 					destinationX = otherCheckpoint->x;
 					destinationY = otherCheckpoint->y;
 				}
+				
 			}
 			
 			if (thrust <= 100 && thrust >= 0) {
-				cout << destinationX << " " << destinationY << " " << thrust << " " << thrust << endl;
+				cout << destinationX << " " << destinationY << " " << thrust << " " << diffAngleTowardCheckpoint << endl;
 			}
 			if (thrust > 100) {
 				cout << destinationX << " " << destinationY << " " << "BOOST BOOST" << endl;
