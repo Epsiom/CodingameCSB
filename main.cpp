@@ -463,6 +463,8 @@ int main()
 	bool isBoostAvailable = true;
 	int turn = 0;
 	
+	int thrust, destinationX, destinationY;
+	
 	
 	// game loop
 	while (1) {
@@ -486,6 +488,106 @@ int main()
 			pod->timeout = pod->timeout-1;
 		}
 		
+		//Temporairement : on fait tourner un algo pour les deux pods
+		for (int podNumber = 0; podNumber<2; podNumber++){
+			Pod* pod = podList[podNumber];
+			Checkpoint* nextCheckpoint = checkpointList[pod->nextCheckpointId];
+			Point nextCheckpointCoords = new Point(nextCheckpoint->x, nextCheckpoint->y);
+			
+			
+			int distTowardCheckpoint = pod->distance(nextCheckpointCoords);
+			int diffAngleTowardCheckpoint = pod->diffAngle(nextCheckpointCoords);
+			
+			int newAngle = pod->angle + diffAngleTowardCheckpoint;
+			if (newAngle >= 360.0) {
+				newAngle = newAngle - 360.0;
+			} else if (newAngle < 0.0) {
+				newAngle += 360.0;
+			}
+			//Passage en radian
+			newAngle = newAngle * 3.14 / 180.0;
+			//Recuperation d'un point eloigne situe dans la bonne direction
+			float angleTargetX = pod->x + cos(newAngle) * 10000.0;
+			float angleTargetY = pod->y + sin(newAngle) * 10000.0;
+			destinationX = angleTargetX;
+			destinationY = angleTargetY;
+			
+			thrust = 0;
+			//Si le checkpoint est derriere nous, on accellere pas, pour ne pas s'en eloigner
+			if (diffAngleTowardCheckpoint > 90 || diffAngleTowardCheckpoint < -90) {
+				thrust = 0;
+			}
+			else {
+				//On ralentit en approchant
+				if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_1) {
+					thrust = CHECKPOINT_APPROACH_THRUST_1;
+				}
+				if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_2) {
+					thrust = CHECKPOINT_APPROACH_THRUST_2;
+				}
+				if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_3) {
+					thrust = CHECKPOINT_APPROACH_THRUST_3;
+				}
+				
+				//Si le boost est disponible et qu'on est assez loin, on boost
+				if (isBoostAvailable
+					&& distTowardCheckpoint >= CHECKPOINT_BOOST_APPROACH_DIST
+					&& diffAngleTowardCheckpoint < 20
+					&& diffAngleTowardCheckpoint > -20) {
+					thrust = 999;   //BOOST
+					isBoostAvailable = false;
+				}
+				
+				//TODO: Evidemment temporaire pour tester
+				//Si on pense avoir le checkpoint
+				if ( (diffAngleTowardCheckpoint < 45 || diffAngleTowardCheckpoint > -45) && distTowardCheckpoint < CHECKPOINT_RADIUS*3) {
+					int otherCheckpointId = pod->nextCheckpointId + 1;
+					if (otherCheckpointId >= checkpointCount) otherCheckpointId = 0;
+					Checkpoint* otherCheckpoint = checkpointList[otherCheckpointId];
+					
+					thrust = 10;
+					destinationX = otherCheckpoint->x;
+					destinationY = otherCheckpoint->y;
+				}
+			}
+			
+			if (thrust <= 100 && thrust >= 0) {
+				cout << destinationX << " " << destinationY << " " << thrust << " " << thrust << endl;
+			}
+			if (thrust > 100) {
+				cout << destinationX << " " << destinationY << " " << "BOOST BOOST" << endl;
+			}
+			if (thrust < 0) {
+				cout << destinationX << " " << destinationY << " " << "SHIELD SHIELD" << endl;
+			}
+			
+			/*
+			void output(Move* move) {
+				float a = angle + move.angle;
+
+				if (a >= 360.0) {
+					a = a - 360.0;
+				} else if (a < 0.0) {
+					a += 360.0;
+				}
+
+				// Look for a point corresponding to the angle we want
+				// Multiply by 10000.0 to limit rounding errors
+				a = a * PI / 180.0;
+				float px = this.x + cos(a) * 10000.0;
+				float py = this.y + sin(a) * 10000.0;
+
+				if (move.shield) {
+					print(round(px), round(py), "SHIELD");
+					activateShield();
+				} else {
+					print(round(px), round(py), move.power);
+				}
+			}
+			*/
+			
+			
+		}
 		
 		
 		
