@@ -42,6 +42,10 @@ float truncate(float value){
 	return ceil(value);
 }
 
+//Produit scalaire entre deux vecteurs
+float dotProduct(float x1, float y1, float x2, float y2){
+	return (x1*x2 + y1*y2);
+}
 
 //-------------------------------------------------------------------------------------
 
@@ -112,7 +116,7 @@ public:
 	int id;
 	float r, vx, vy;
 	Unit ();
-	//Collision* collision(Unit u);
+	bool collision(const Unit& u);
 	//void bounce(Unit u);
 };
 
@@ -125,38 +129,37 @@ Unit::Unit (){
     this->vy = 0;
 }
 
-/*
-//Cherche et retourne la potentielle collision effectuee avec une autre unite (null sinon)
-//TODO: temps reel? Dixiemes de tours de rotation max 1.8 ?
+
+//True si une collision est possible dans les vitesses utilisees, false sinon
 //TODO: COLLISIONS AVEC UN CHECKPOINT A REVOIR: LE CENTRE DOIT PASSER DANS LE RAYON, PAS DE CONTACT DE RADIUS!
-Collision* Unit::collision(Unit u) {
-    // Square of the distance
+bool Unit::collision(const Unit& u) {
+	
+	// We take everything squared to avoid calling sqrt uselessly. It is better for performances
     float dist = this->distance2(u);
-
-    // Sum of the radii squared
-    float sr = (this->r + u.r)*(this->r + u.r);
-
-    // We take everything squared to avoid calling sqrt uselessly. It is better for performances
-
+	int sr = 2*POD_RADIUS*2*POD_RADIUS;
+	
     if (dist < sr) {
-        // Objects are already touching each other. We have an immediate collision.
-        return new Collision(this, u, 0.0);
+        //Les pods sont deja en contact
+        return true;
     }
 
-	//TODO: ameliorer (vitesse plus faible que u en etant derriere, ou vitesses d'angles > 90)
-    // Optimisation. Objects with the same speed will never collide
-    if (this->vx == u.vx && this->vy == u.vy) {
-        return null;
-    }
-
-    // We place ourselves in the reference frame of u. u is therefore stationary and is at (0,0)
+    // On se place dans le referentiel de u, qui est stationnaire et a l'origine
+	Point up = new Point(0, 0);	//vx et vy = 0 pour u
+	
     float x = this->x - u.x;
     float y = this->y - u.y;
     Point myp = new Point(x, y);
     float vx = this->vx - u.vx;
     float vy = this->vy - u.vy;
-    Point up = new Point(0, 0)
-
+    
+	//Optimisation : des objets ne se rapprochant pas ne peuvent pas entrer en collision
+	//On verifie avec le produit scalaire entre le vecteur de vitesse et celui allant de this a u
+	//S'il est negatif, on s'ecarte de u. S'il est nul, vx et vy sont nuls
+	float dotProductBetweenThisAndU = dotProduct(vx, vy, -x, -y);
+	if (dotProductBetweenThisAndU <= 0){
+		return false;
+	}
+	
     // We look for the closest point to u (which is in (0,0)) on the line described by our speed vector
     Point p = up.closest(myp, new Point(x + vx, y + vy));
 
@@ -178,75 +181,29 @@ Collision* Unit::collision(Unit u) {
 
         // If the point is now further away it means we are not going the right way, therefore the collision won't happen
         if (myp.distance2(p) > mypdist) {
-            return null;
+            return false;
+			//return null;
         }
 
         pdist = p.distance(myp);
 
         // The point of impact is further than what we can travel in one turn
         if (pdist > length) {
-            return null;
+            return false;
+			//return null;
         }
 
         // Time needed to reach the impact point
         float t = pdist / length;
 
-        return new Collision(this, &u, t);
+		return true;
+        //return new Collision(this, &u, t);
     }
 
-    return null;
+	return false;
+    //return null;
 }
 
-//Calcul du rebond apres une collision (dans le cas d'un checkpoint, il est nul)
-//TODO: COLLISIONS AVEC UN CHECKPOINT A REVOIR: LE CENTRE DOIT PASSER DANS LE RAYON, PAS DE CONTACT DE RADIUS!
-void Unit::bounce(Unit u) {
-    if (u instanceof Checkpoint) {
-        // Collision with a checkpoint
-        this.bounceWithCheckpoint((Checkpoint) u);
-    } else {
-        // If a pod has its shield active its mass is 10 otherwise it's 1
-        float m1 = this.shield ? 10 : 1;
-        float m2 = u.shield ? 10 : 1;
-        float mcoeff = (m1 + m2) / (m1 * m2);
-
-        float nx = this.x - u.x;
-        float ny = this.y - u.y;
-
-        // Square of the distance between the 2 pods. This value could be hardcoded because it is always 800²
-        float nxnysquare = nx*nx + ny*ny;
-
-        float dvx = this.vx - u.vx;
-        float dvy = this.vy - u.vy;
-
-        // fx and fy are the components of the impact vector. product is just there for optimisation purposes
-        float product = nx*dvx + ny*dvy;
-        float fx = (nx * product) / (nxnysquare * mcoeff);
-        float fy = (ny * product) / (nxnysquare * mcoeff);
-
-        // We apply the impact vector once
-        this.vx -= fx / m1;
-        this.vy -= fy / m1;
-        u.vx += fx / m2;
-        u.vy += fy / m2;
-
-        // If the norm of the impact vector is less than 120, we normalize it to 120
-        float impulse = sqrt(fx*fx + fy*fy);
-        if (impulse < 120.0) {
-            fx = fx * 120.0 / impulse;
-            fy = fy * 120.0 / impulse;
-        }
-
-        // We apply the impact vector a second time
-        this.vx -= fx / m1;
-        this.vy -= fy / m1;
-        u.vx += fx / m2;
-        u.vy += fy / m2;
-
-        // This is one of the rare places where a Vector class would have made the code more readable.
-        // But this place is called so often that I can't pay a performance price to make it more readable.
-    }
-}
-*/
 
 
 //-------------------------------------------------------------------------------------
@@ -520,6 +477,7 @@ int main()
 			cerr << "newAngle: " << newAngle << endl;
 			
 			/*
+			//TODO : REFAIRE
 			//Passage en radian
 			newAngle = newAngle * PI / 180.0;
 			//Recuperation d'un point eloigne situe dans la bonne direction
