@@ -116,7 +116,6 @@ public:
 	int id;
 	float r, vx, vy;
 	Unit ();
-	bool collision(const Unit& u);
 	//void bounce(Unit u);
 };
 
@@ -127,81 +126,6 @@ Unit::Unit (){
     this->r = 0;
     this->vx = 0;
     this->vy = 0;
-}
-
-
-//True si une collision est possible dans les vitesses utilisees, false sinon
-//TODO: COLLISIONS AVEC UN CHECKPOINT A REVOIR: LE CENTRE DOIT PASSER DANS LE RAYON, PAS DE CONTACT DE RADIUS!
-bool Unit::collision(const Unit& u) {
-	
-	// We take everything squared to avoid calling sqrt uselessly. It is better for performances
-    float dist = this->distance2(u);
-	int sr = 2*POD_RADIUS*2*POD_RADIUS;
-	
-    if (dist < sr) {
-        //Les pods sont deja en contact
-        return true;
-    }
-
-    // On se place dans le referentiel de u, qui est stationnaire et a l'origine
-	Point up = new Point(0, 0);	//vx et vy = 0 pour u
-	
-    float x = this->x - u.x;
-    float y = this->y - u.y;
-    Point myp = new Point(x, y);
-    float vx = this->vx - u.vx;
-    float vy = this->vy - u.vy;
-    
-	//Optimisation : des objets ne se rapprochant pas ne peuvent pas entrer en collision
-	//On verifie avec le produit scalaire entre le vecteur de vitesse et celui allant de this a u
-	//S'il est negatif, on s'ecarte de u. S'il est nul, vx et vy sont nuls
-	float dotProductBetweenThisAndU = dotProduct(vx, vy, -x, -y);
-	if (dotProductBetweenThisAndU <= 0){
-		return false;
-	}
-	
-    // We look for the closest point to u (which is in (0,0)) on the line described by our speed vector
-    Point p = up.closest(myp, new Point(x + vx, y + vy));
-
-    // Square of the distance between u and the closest point to u on the line described by our speed vector
-    float pdist = up.distance2(p);
-
-    // Square of the distance between us and that point
-    float mypdist = myp.distance2(p);
-
-    // If the distance between u and this line is less than the sum of the radii, there might be a collision
-    if (pdist < sr) {
-     // Our speed on the line
-        float length = sqrt(vx*vx + vy*vy);
-
-        // We move along the line to find the point of impact
-        float backdist = sqrt(sr - pdist);
-        p.x = p.x - backdist * (vx / length);
-        p.y = p.y - backdist * (vy / length);
-
-        // If the point is now further away it means we are not going the right way, therefore the collision won't happen
-        if (myp.distance2(p) > mypdist) {
-            return false;
-			//return null;
-        }
-
-        pdist = p.distance(myp);
-
-        // The point of impact is further than what we can travel in one turn
-        if (pdist > length) {
-            return false;
-			//return null;
-        }
-
-        // Time needed to reach the impact point
-        float t = pdist / length;
-
-		return true;
-        //return new Collision(this, &u, t);
-    }
-
-	return false;
-    //return null;
 }
 
 
@@ -238,6 +162,7 @@ public:
 	Pod* partner;
 	bool shield;	//Le shield est actif 3 tours
 	Pod (int t_id);
+	Pod (const Pod& podToClone); //clone
 	Pod (float t_x, float t_y, int t_id, float t_vx, float t_vy, float t_angle, int t_nextCheckpointId, int t_checked, int t_timeout, Pod* t_partner, bool t_shield);
 	void update(float pod_x, float pod_y, float pod_vx, float pod_vy, float pod_angle, int pod_nextCheckPointId);
 	float getAngle(const Point& p);
@@ -247,6 +172,8 @@ public:
 	void move(float t);
 	void end();
 	void play(const Point& p, int thrust);
+	bool collision(const Unit& u);
+	int isCollisionPossibleWithMovement(const Point& p, int thrust, Pod* podlist);
 };
 
 Pod::Pod (int t_id){
@@ -264,6 +191,24 @@ Pod::Pod (int t_id){
 	this->timeout = 100;
 	this->partner = nullptr;
 	this->shield = false;
+}
+
+//Fonction de clonage
+Pod::Pod (const Pod& podToClone){
+	this->x = pod->x;
+	this->y = pod->y;
+	
+	this->id = pod->id;
+	this->r = pod->r;
+	this->vx = pod->vx;
+	this->vy = pod->vy;
+	
+	this->angle = pod->angle;
+	this->nextCheckpointId = pod->nextCheckpointId;
+	this->checked = pod->checked;
+	this->timeout = pod->timeout;
+	this->partner = pod->partner;
+	this->shield = pod->shield;
 }
 
 Pod::Pod (float t_x, float t_y, int t_id, float t_vx, float t_vy, float t_angle, int t_nextCheckpointId, int t_checked, int t_timeout, Pod* t_partner, bool t_shield){
@@ -389,8 +334,95 @@ void Pod::play(const Point& p, int thrust) {
     this->end();
 }
 
+//True si une collision est possible dans les vitesses utilisees, false sinon
+//TODO: COLLISIONS AVEC UN CHECKPOINT A REVOIR: LE CENTRE DOIT PASSER DANS LE RAYON, PAS DE CONTACT DE RADIUS!
+bool Pod::collision(const Unit& u) {
+	
+	// We take everything squared to avoid calling sqrt uselessly. It is better for performances
+    float dist = this->distance2(u);
+	int sr = 2*POD_RADIUS*2*POD_RADIUS;
+	
+    if (dist < sr) {
+        //Les pods sont deja en contact
+        return true;
+    }
+
+    // On se place dans le referentiel de u, qui est stationnaire et a l'origine
+	Point up = new Point(0, 0);	//vx et vy = 0 pour u
+	
+    float x = this->x - u.x;
+    float y = this->y - u.y;
+    Point myp = new Point(x, y);
+    float vx = this->vx - u.vx;
+    float vy = this->vy - u.vy;
+    
+	//Optimisation : des objets ne se rapprochant pas ne peuvent pas entrer en collision
+	//On verifie avec le produit scalaire entre le vecteur de vitesse et celui allant de this a u
+	//S'il est negatif, on s'ecarte de u. S'il est nul, vx et vy sont nuls
+	float dotProductBetweenThisAndU = dotProduct(vx, vy, -x, -y);
+	if (dotProductBetweenThisAndU <= 0){
+		return false;
+	}
+	
+    // We look for the closest point to u (which is in (0,0)) on the line described by our speed vector
+    Point p = up.closest(myp, new Point(x + vx, y + vy));
+
+    // Square of the distance between u and the closest point to u on the line described by our speed vector
+    float pdist = up.distance2(p);
+
+    // Square of the distance between us and that point
+    float mypdist = myp.distance2(p);
+
+    // If the distance between u and this line is less than the sum of the radii, there might be a collision
+    if (pdist < sr) {
+     // Our speed on the line
+        float length = sqrt(vx*vx + vy*vy);
+
+        // We move along the line to find the point of impact
+        float backdist = sqrt(sr - pdist);
+        p.x = p.x - backdist * (vx / length);
+        p.y = p.y - backdist * (vy / length);
+
+        // If the point is now further away it means we are not going the right way, therefore the collision won't happen
+        if (myp.distance2(p) > mypdist) {
+            return false;
+			//return null;
+        }
+
+        pdist = p.distance(myp);
+
+        // The point of impact is further than what we can travel in one turn
+        if (pdist > length) {
+            return false;
+			//return null;
+        }
+
+        // Time needed to reach the impact point
+        float t = pdist / length;
+
+		return true;
+        //return new Collision(this, &u, t);
+    }
+
+	return false;
+    //return null;
+}
+
+//Retourne -1 si aucune collision n'est cense arriver avec ce mouvement et l'id du premier pod en collision sinon
+int Pod::isCollisionPossibleWithMovement(const Point& p, int thrust, Pod* podlist){
+	Pod clone = new Pod(*this); 
+	clone.rotate(p);
+    clone.boost(thrust);
+	for (int i=0; i<4; i++){
+		if ( i != clone->id && clone.collision(podlist[i]) ) return i;
+	}
+	return -1;
+}
 
 
+
+
+//-------------------------------------------------------------------------------------
 
 
 class Checkpoint : public Unit{
