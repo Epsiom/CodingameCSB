@@ -562,8 +562,7 @@ int main()
 				destinationX = nextCheckpoint->x + steeringNormalizedX; //pod->x + 10000.0*steeringNormalizedX;
 				destinationY = nextCheckpoint->y + steeringNormalizedY; //pod->y + 10000.0*steeringNormalizedY;
 				
-				
-				dotProductSpeedAndAngleCheckpoint = dotProduct(pod->vx/speedVectorDet, pod->vy/speedVectorDet, destinationX, destinationY);
+				dotProductSpeedAndAngleCheckpoint = dotProduct(pod->vx/speedVectorDet, pod->vy/speedVectorDet, desiredNormalizedX, desiredNormalizedY);
 				cerr << "pod->x " << pod->x << endl;
 				cerr << "pod->y " << pod->y << endl;
 				cerr << "destinationX " << destinationX << endl;
@@ -577,11 +576,12 @@ int main()
 				cerr << "steeringNormalizedY: " << steeringNormalizedY << endl;
 				cerr << "desiredNormalizedX: " << desiredNormalizedX << endl;
 				cerr << "desiredNormalizedY: " << desiredNormalizedY << endl;
-				cerr << "dotProductSpeedAndAngleCheckpoint: " << dotProductSpeedAndAngleCheckpoint << endl;
+				cerr << "DOT PRODUCT: " << dotProductSpeedAndAngleCheckpoint << endl;
 			}
 			
 			//On s'eloigne du point : on n'accellere pas
 			if (dotProductSpeedAndAngleCheckpoint <= 0){
+				cerr << "---THRUST---: " << thrust << endl;
 				thrust = 0;
 			}
 			else {
@@ -589,10 +589,11 @@ int main()
 				//Controle de la vitesse selon l'angle d'approche avec le checkpoint
 				if (speedVectorDet != 0){
 					thrust = 100*dotProductSpeedAndAngleCheckpoint;
-					cerr << "thrustdotproduct: " << thrust << endl;
+					cerr << "---THRUST---: " << thrust << endl;
 				}
 				else{
 					thrust = 100;
+					cerr << "---THRUST---: " << thrust << endl;
 					cerr << "speed = 0 donc thrust=100" << endl;
 				}
 				
