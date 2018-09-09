@@ -195,20 +195,20 @@ Pod::Pod (int t_id){
 
 //Fonction de clonage
 Pod::Pod (const Pod& podToClone){
-	this->x = pod->x;
-	this->y = pod->y;
+	this->x = podToClone.x;
+	this->y = podToClone.y;
 	
-	this->id = pod->id;
-	this->r = pod->r;
-	this->vx = pod->vx;
-	this->vy = pod->vy;
+	this->id = podToClone.id;
+	this->r = podToClone.r;
+	this->vx = podToClone.vx;
+	this->vy = podToClone.vy;
 	
-	this->angle = pod->angle;
-	this->nextCheckpointId = pod->nextCheckpointId;
-	this->checked = pod->checked;
-	this->timeout = pod->timeout;
-	this->partner = pod->partner;
-	this->shield = pod->shield;
+	this->angle = podToClone.angle;
+	this->nextCheckpointId = podToClone.nextCheckpointId;
+	this->checked = podToClone.checked;
+	this->timeout = podToClone.timeout;
+	this->partner = podToClone.partner;
+	this->shield = podToClone.shield;
 }
 
 Pod::Pod (float t_x, float t_y, int t_id, float t_vx, float t_vy, float t_angle, int t_nextCheckpointId, int t_checked, int t_timeout, Pod* t_partner, bool t_shield){
@@ -348,11 +348,11 @@ bool Pod::collision(const Unit& u) {
     }
 
     // On se place dans le referentiel de u, qui est stationnaire et a l'origine
-	Point up = new Point(0, 0);	//vx et vy = 0 pour u
+	Point up = Point(0, 0);	//vx et vy = 0 pour u
 	
     float x = this->x - u.x;
     float y = this->y - u.y;
-    Point myp = new Point(x, y);
+    Point myp = Point(x, y);
     float vx = this->vx - u.vx;
     float vy = this->vy - u.vy;
     
@@ -365,13 +365,13 @@ bool Pod::collision(const Unit& u) {
 	}
 	
     // We look for the closest point to u (which is in (0,0)) on the line described by our speed vector
-    Point p = up.closest(myp, new Point(x + vx, y + vy));
+    Point* p = up.closest(myp, Point(x + vx, y + vy));
 
     // Square of the distance between u and the closest point to u on the line described by our speed vector
-    float pdist = up.distance2(p);
+    float pdist = up.distance2(*p);
 
     // Square of the distance between us and that point
-    float mypdist = myp.distance2(p);
+    float mypdist = myp.distance2(*p);
 
     // If the distance between u and this line is less than the sum of the radii, there might be a collision
     if (pdist < sr) {
@@ -380,16 +380,16 @@ bool Pod::collision(const Unit& u) {
 
         // We move along the line to find the point of impact
         float backdist = sqrt(sr - pdist);
-        p.x = p.x - backdist * (vx / length);
-        p.y = p.y - backdist * (vy / length);
+        p->x = p->x - backdist * (vx / length);
+        p->y = p->y - backdist * (vy / length);
 
         // If the point is now further away it means we are not going the right way, therefore the collision won't happen
-        if (myp.distance2(p) > mypdist) {
+        if (myp.distance2(*p) > mypdist) {
             return false;
 			//return null;
         }
 
-        pdist = p.distance(myp);
+        pdist = p->distance(myp);
 
         // The point of impact is further than what we can travel in one turn
         if (pdist > length) {
@@ -410,11 +410,11 @@ bool Pod::collision(const Unit& u) {
 
 //Retourne -1 si aucune collision n'est cense arriver avec ce mouvement et l'id du premier pod en collision sinon
 int Pod::isCollisionPossibleWithMovement(const Point& p, int thrust, Pod* podlist){
-	Pod clone = new Pod(*this); 
-	clone.rotate(p);
-    clone.boost(thrust);
+	Pod* clone = new Pod( ((const Pod&)*this)); 
+	clone->rotate(p);
+    clone->boost(thrust);
 	for (int i=0; i<4; i++){
-		if ( i != clone->id && clone.collision(podlist[i]) ) return i;
+		if ( i != clone->id && clone->collision(podlist[i]) ) return i;
 	}
 	return -1;
 }
@@ -459,6 +459,7 @@ int main()
 		int cx, cy;
 		cin >> cx >> cy; cin.ignore();
 		checkpointList[i] = new Checkpoint (cx, cy, i);
+		cerr << "checkpoint id:" << i << endl;
 	}
 
 	//Instanciation des pods
@@ -497,8 +498,8 @@ int main()
 			Point* nextCheckpointCoords = new Point(nextCheckpoint->x, nextCheckpoint->y);
 			
 			
-			int distTowardCheckpoint = pod->distance(*nextCheckpointCoords);
-			int diffAngleTowardCheckpoint = pod->diffAngle(*nextCheckpointCoords);
+			float distTowardCheckpoint = pod->distance(*nextCheckpointCoords);
+			float diffAngleTowardCheckpoint = pod->diffAngle(*nextCheckpointCoords);
 			
 			int newAngle = pod->angle + diffAngleTowardCheckpoint;
 			if (newAngle >= 360.0) {
@@ -522,24 +523,74 @@ int main()
 			destinationY = nextCheckpoint->y;
 			
 			
-			thrust = 0;
-			//Si le checkpoint est derriere nous, on accellere pas, pour ne pas s'en eloigner
-			if (diffAngleTowardCheckpoint > 90 || diffAngleTowardCheckpoint < -90) {
+			thrust = 100;
+			
+			/*
+			//On ralentit en approchant
+			if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_1) {
+				thrust = CHECKPOINT_APPROACH_THRUST_1;
+			}
+			if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_2) {
+				thrust = CHECKPOINT_APPROACH_THRUST_2;
+			}
+			if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_3) {
+				thrust = CHECKPOINT_APPROACH_THRUST_3;
+			}
+			*/
+			
+			
+			/*
+			Point origin (0,0);
+			Point speedVector (pod->vx, pod->vy);
+			float speedVectorDet = origin.distance(speedVector);
+			Point speedVectorNormalized (pod->vx/speedVectorDet, pod->vy/speedVectorDet);
+			*/
+			
+			Point origin (0,0);
+			Point speedVector (pod->vx, pod->vy);
+			float speedVectorDet = origin.distance(speedVector);
+			float dotProductSpeedAndAngleCheckpoint = 1;
+			if (speedVectorDet != 0){
+				float desiredNormalizedX = (pod->x - nextCheckpoint->x)/distTowardCheckpoint;
+				float desiredNormalizedY = (pod->y - nextCheckpoint->y)/distTowardCheckpoint;
+				
+				//Steering = desired - velocity
+				float steeringNormalizedX = desiredNormalizedX - (pod->vx)/speedVectorDet;
+				float steeringNormalizedY = desiredNormalizedY - (pod->vy)/speedVectorDet;
+				
+				//Point tres eloigne dans la direction du vecteur de steering
+				destinationX = pod->x + 10000*steeringNormalizedX;
+				destinationY = pod->y + 10000*steeringNormalizedY;
+				
+				dotProductSpeedAndAngleCheckpoint = dotProduct(pod->vx/speedVectorDet, pod->vy/speedVectorDet, desiredNormalizedX, desiredNormalizedY);
+				
+				cerr << "pod->vx " << pod->vx << endl;
+				cerr << "speedVectorDet " << speedVectorDet << endl;
+				cerr << "pod->vx/speedVectorDet: " << pod->vx/speedVectorDet << endl;
+				cerr << "pod->vy/speedVectorDet: " << pod->vy/speedVectorDet << endl;
+				cerr << "steeringNormalizedX: " << steeringNormalizedX << endl;
+				cerr << "steeringNormalizedY: " << steeringNormalizedY << endl;
+				cerr << "desiredNormalizedX: " << desiredNormalizedX << endl;
+				cerr << "desiredNormalizedY: " << desiredNormalizedY << endl;
+				cerr << "dotProductSpeedAndAngleCheckpoint: " << dotProductSpeedAndAngleCheckpoint << endl;
+			}
+			
+			//On s'eloigne du point : on n'accellere pas
+			if (dotProductSpeedAndAngleCheckpoint <= 0){
 				thrust = 0;
 			}
 			else {
-				thrust = 100;
 				
-				//On ralentit en approchant
-				if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_1) {
-					thrust = CHECKPOINT_APPROACH_THRUST_1;
+				//Controle de la vitesse selon l'angle d'approche avec le checkpoint
+				if (speedVectorDet != 0){
+					thrust = 100*dotProductSpeedAndAngleCheckpoint;
+					cerr << "thrustdotproduct: " << thrust << endl;
 				}
-				if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_2) {
-					thrust = CHECKPOINT_APPROACH_THRUST_2;
+				else{
+					thrust = 100;
+					cerr << "speed = 0 donc thrust=100" << endl;
 				}
-				if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_3) {
-					thrust = CHECKPOINT_APPROACH_THRUST_3;
-				}
+				
 				
 				//Si le boost est disponible et qu'on est assez loin, on boost
 				if (isBoostAvailable
@@ -563,8 +614,11 @@ int main()
 					destinationX = otherCheckpoint->x;
 					destinationY = otherCheckpoint->y;
 				}
-				
 			}
+			
+			
+			
+			
 			
 			if (thrust <= 100 && thrust >= 0) {
 				cout << destinationX << " " << destinationY << " " << thrust << " " << diffAngleTowardCheckpoint << endl;
