@@ -579,22 +579,7 @@ int main()
 						thrust = 999;   //BOOST
 						isBoostAvailable = false;
 					}
-					
-					//TODO: Evidemment temporaire pour tester
-					//Si on pense avoir le checkpoint
-					/*
-					Point threeTurnVaguePrediction (pod->x+3*pod->vx, pod->y+3*pod->vy);
-					
-					if (threeTurnVaguePrediction.distance(*nextCheckpointCoords) < CHECKPOINT_RADIUS) {
-						int otherCheckpointId = pod->nextCheckpointId + 1;
-						if (otherCheckpointId >= checkpointCount) otherCheckpointId = 0;
-						Checkpoint* otherCheckpoint = checkpointList[otherCheckpointId];
-						
-						thrust = 10;
-						destinationX = otherCheckpoint->x;
-						destinationY = otherCheckpoint->y;
-					}
-					*/
+				
 				}
 				
 			}
@@ -609,96 +594,9 @@ int main()
 				cout << destinationX << " " << destinationY << " " << "SHIELD SHIELD" << endl;
 			}
 			
-			/*
-			void output(Move* move) {
-				float a = angle + move.angle;
-
-				if (a >= 360.0) {
-					a = a - 360.0;
-				} else if (a < 0.0) {
-					a += 360.0;
-				}
-
-				// Look for a point corresponding to the angle we want
-				// Multiply by 10000.0 to limit rounding errors
-				a = a * PI / 180.0;
-				float px = this.x + cos(a) * 10000.0;
-				float py = this.y + sin(a) * 10000.0;
-
-				if (move.shield) {
-					print(round(px), round(py), "SHIELD");
-					activateShield();
-				} else {
-					print(round(px), round(py), move.power);
-				}
-			}
-			*/
-			
 			
 		}
 		
-		
-		
-		/*
-		int thrust = 0;
-
-		//Si le checkpoint est derriere nous, on accellere pas, pour ne pas s'en eloigner
-		if (nextCheckpointAngle > 90 || nextCheckpointAngle < -90) {
-			thrust = 0;
-		}
-		else {
-			thrust = 100;
-
-
-			//On ralentit en approchant
-			if (nextCheckpointDist < CHECKPOINT_APPROACH_DIST_1) {
-				thrust = CHECKPOINT_APPROACH_THRUST_1;
-			}
-			if (nextCheckpointDist < CHECKPOINT_APPROACH_DIST_2) {
-				thrust = CHECKPOINT_APPROACH_THRUST_2;
-			}
-			if (nextCheckpointDist < CHECKPOINT_APPROACH_DIST_3) {
-				thrust = CHECKPOINT_APPROACH_THRUST_3;
-			}
-
-
-
-			//Calcul de la position approximative du tour suivant, pour verifier si on sera dans le checkpoint
-			Point nextPosition(x + 3 * velocityX, y + 3 * velocityY);
-
-			cerr << "nextCheckpointX : " << x + 2 * velocityX << endl;
-			cerr << "nextCheckpointY : " << y + 2 * velocityY << endl;
-			cerr << "nextCheckpoint.getDistance(nextPosition) : " << nextCheckpoint.distance(nextPosition) << endl;
-
-			//Si on sait qu'on sera dans le point, on tourne deja vers le centre pour se preparer
-			if (nextCheckpoint.getDistance(nextPosition) < CHECKPOINT_RADIUS) {
-				thrust = 10;
-				destinationX = MAP_CENTER_X;
-				destinationY = MAP_CENTER_Y;
-			}
-
-
-			//Si le boost est disponible et qu'on est assez loin, on boost
-			if (isBoostAvailable
-				&& nextCheckpointDist >= CHECKPOINT_BOOST_APPROACH_DIST
-				&& nextCheckpointAngle < 20
-				&& nextCheckpointAngle > -20) {
-				thrust = 999;   //BOOST
-				isBoostAvailable = false;
-			}
-		}
-
-
-		if (thrust <= 100 && thrust >= 0) {
-			cout << destinationX << " " << destinationY << " " << thrust << " " << thrust << endl;
-		}
-		if (thrust > 100) {
-			cout << destinationX << " " << destinationY << " " << "BOOST BOOST" << endl;
-		}
-		if (thrust < 0) {
-			cout << destinationX << " " << destinationY << " " << "SHIELD SHIELD" << endl;
-		}
-		*/
 		turn++;
 	}
 }
