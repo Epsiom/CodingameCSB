@@ -157,7 +157,7 @@ class Pod : public Unit{
 public:
 	float angle;	//(0:est, 90:sud, 180:ouest, 270:nord)
 	int nextCheckpointId;
-	int checked;	//TODO: a comprendre
+	int checked;	//TODO: idee non utilisee issue de Magnus : a retirer
 	int timeout;	//100 tours sans passer de checkpoint = elimination
 	Pod* partner;
 	bool shield;	//Le shield est actif 3 tours
@@ -173,7 +173,8 @@ public:
 	void end();
 	void play(const Point& p, int thrust);
 	bool collision(const Unit& u);
-	int isCollisionPossibleWithMovement(const Point& p, int thrust, Pod* podlist);
+	bool isCollisionPossibleWithMovement(const Point& myTarget, int thrust, Pod* pod, const Point& hisTarget, int hisThrust);
+	float isCheckpointReachable(const Point& checkpoint, int thrust, const Point& movementTarget, float timeToReach);
 };
 
 Pod::Pod (int t_id){
@@ -408,17 +409,29 @@ bool Pod::collision(const Unit& u) {
     //return null;
 }
 
-//Retourne -1 si aucune collision n'est cense arriver avec ce mouvement et l'id du premier pod en collision sinon
-int Pod::isCollisionPossibleWithMovement(const Point& p, int thrust, Pod* podlist){
-	Pod* clone = new Pod( ((const Pod&)*this)); 
-	clone->rotate(p);
-    clone->boost(thrust);
-	for (int i=0; i<4; i++){
-		if ( i != clone->id && clone->collision(podlist[i]) ) return i;
+//Retourne true si une collision est cense arriver avec ce mouvement avec le pod
+bool Pod::isCollisionPossibleWithMovement(const Point& myTarget, int thrust, Pod* pod, const Point& hisTarget, int hisThrust){
+	Pod* clone = new Pod( ((const Pod&)*this));
+	clone->rotate(myTarget);
+    clone->boost(thrust);	//Rappel : augmente la vitesse mais ne deplace pas
+	Pod* clone2 = new Pod( (const Pod&) *pod ); 
+	clone2->rotate(hisTarget);
+	clone2->boost(hisThrust);
+	return clone->collision(*pod);
+}
+
+//Retourne le moment ou ce deplacement peut valider le checkpoint avec la puissance et le point target donne, et -1 sinon
+float Pod::isCheckpointReachable(const Point& checkpoint, int thrust, const Point& movementTarget, float timeToReach){
+	Pod* clone = new Pod( ((const Pod&)*this));
+	clone->rotate(movementTarget);
+	clone->boost(thrust);	//Rappel : augmente la vitesse mais ne deplace pas
+    for (float time = 0.1; time <= timeToReach; time+= 0.1){
+		clone->move(0.1);	//Rappel : augmente la vitesse mais ne deplace pas
+		Point position (clone->x, clone->y);
+		if (position.distance(checkpoint) < CHECKPOINT_RADIUS) return time;
 	}
 	return -1;
 }
-
 
 
 
@@ -459,7 +472,6 @@ int main()
 		int cx, cy;
 		cin >> cx >> cy; cin.ignore();
 		checkpointList[i] = new Checkpoint (cx, cy, i);
-		cerr << "checkpoint id:" << i << endl;
 	}
 
 	//Instanciation des pods
@@ -498,134 +510,94 @@ int main()
 			Point* nextCheckpointCoords = new Point(nextCheckpoint->x, nextCheckpoint->y);
 			
 			
-			float distTowardCheckpoint = pod->distance(*nextCheckpointCoords);
-			float diffAngleTowardCheckpoint = pod->diffAngle(*nextCheckpointCoords);
+			int distTowardCheckpoint = pod->distance(*nextCheckpointCoords);
+			int diffAngleTowardCheckpoint = pod->diffAngle(*nextCheckpointCoords);
 			
-			int newAngle = pod->angle + diffAngleTowardCheckpoint;
-			if (newAngle >= 360.0) {
-				newAngle = newAngle - 360.0;
-			} else if (newAngle < 0.0) {
-				newAngle += 360.0;
-			}
-			cerr << "newAngle: " << newAngle << endl;
 			
-			/*
-			//TODO : REFAIRE
-			//Passage en radian
-			newAngle = newAngle * PI / 180.0;
-			//Recuperation d'un point eloigne situe dans la bonne direction
-			float angleTargetX = pod->x + cos(newAngle) * 10000.0;
-			float angleTargetY = pod->y + sin(newAngle) * 10000.0;
-			destinationX = angleTargetX;
-			destinationY = angleTargetY;
-			*/
 			destinationX = nextCheckpoint->x;
 			destinationY = nextCheckpoint->y;
 			
-			
-			thrust = 100;
-			
-			/*
-			//On ralentit en approchant
-			if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_1) {
-				thrust = CHECKPOINT_APPROACH_THRUST_1;
-			}
-			if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_2) {
-				thrust = CHECKPOINT_APPROACH_THRUST_2;
-			}
-			if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_3) {
-				thrust = CHECKPOINT_APPROACH_THRUST_3;
-			}
-			*/
-			
-			
-			/*
-			Point origin (0,0);
-			Point speedVector (pod->vx, pod->vy);
-			float speedVectorDet = origin.distance(speedVector);
-			Point speedVectorNormalized (pod->vx/speedVectorDet, pod->vy/speedVectorDet);
-			*/
-			
-			Point origin (0,0);
-			Point speedVector (pod->vx, pod->vy);
-			float speedVectorDet = origin.distance(speedVector);
-			float dotProductSpeedAndAngleCheckpoint = 1;
-			if (speedVectorDet != 0){
-				float desiredNormalizedX = (pod->x - nextCheckpoint->x)/distTowardCheckpoint;
-				float desiredNormalizedY = (pod->y - nextCheckpoint->y)/distTowardCheckpoint;
-				
-				//Steering = desired - velocity
-				float steeringNormalizedX = desiredNormalizedX - (pod->vx)/speedVectorDet;
-				float steeringNormalizedY = desiredNormalizedY - (pod->vy)/speedVectorDet;
-				
-				//Point tres eloigne dans la direction du vecteur de steering
-				destinationX = nextCheckpoint->x + steeringNormalizedX; //pod->x + 10000.0*steeringNormalizedX;
-				destinationY = nextCheckpoint->y + steeringNormalizedY; //pod->y + 10000.0*steeringNormalizedY;
-				
-				dotProductSpeedAndAngleCheckpoint = dotProduct(pod->vx/speedVectorDet, pod->vy/speedVectorDet, desiredNormalizedX, desiredNormalizedY);
-				cerr << "pod->x " << pod->x << endl;
-				cerr << "pod->y " << pod->y << endl;
-				cerr << "destinationX " << destinationX << endl;
-				cerr << "destinationY " << destinationY << endl;
-				
-				cerr << "pod->vx " << pod->vx << endl;
-				cerr << "speedVectorDet " << speedVectorDet << endl;
-				cerr << "pod->vx/speedVectorDet: " << pod->vx/speedVectorDet << endl;
-				cerr << "pod->vy/speedVectorDet: " << pod->vy/speedVectorDet << endl;
-				cerr << "steeringNormalizedX: " << steeringNormalizedX << endl;
-				cerr << "steeringNormalizedY: " << steeringNormalizedY << endl;
-				cerr << "desiredNormalizedX: " << desiredNormalizedX << endl;
-				cerr << "desiredNormalizedY: " << desiredNormalizedY << endl;
-				cerr << "DOT PRODUCT: " << dotProductSpeedAndAngleCheckpoint << endl;
-			}
-			
-			//On s'eloigne du point : on n'accellere pas
-			if (dotProductSpeedAndAngleCheckpoint <= 0){
-				cerr << "---THRUST---: " << thrust << endl;
+			//Si le checkpoint est derriere nous, on accellere pas, pour ne pas s'en eloigner
+			if (diffAngleTowardCheckpoint > 90 || diffAngleTowardCheckpoint < -90) {
 				thrust = 0;
 			}
 			else {
+				thrust = 100 - (diffAngleTowardCheckpoint*100/90);	//TODO: retirer? Ameliorer?
 				
-				//Controle de la vitesse selon l'angle d'approche avec le checkpoint
-				if (speedVectorDet != 0){
-					thrust = 100*dotProductSpeedAndAngleCheckpoint;
-					cerr << "---THRUST---: " << thrust << endl;
+				//On ralentit en approchant
+				if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_1) {
+					thrust = CHECKPOINT_APPROACH_THRUST_1;
+				}
+				if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_2) {
+					thrust = CHECKPOINT_APPROACH_THRUST_2;
+				}
+				if (distTowardCheckpoint < CHECKPOINT_APPROACH_DIST_3) {
+					thrust = CHECKPOINT_APPROACH_THRUST_3;
+				}
+				
+				Checkpoint* checkpointAfterward;
+				//On verifie si on peut tourner tout de suite vers le prochain checkpoint, en diminuant la vitesse au fur et a mesure
+				if (pod->nextCheckpointId + 1 >= checkpointCount){
+					checkpointAfterward = checkpointList[0];
 				}
 				else{
-					thrust = 100;
-					cerr << "---THRUST---: " << thrust << endl;
-					cerr << "speed = 0 donc thrust=100" << endl;
+					checkpointAfterward = checkpointList[pod->nextCheckpointId + 1];
 				}
-				
-				/*
-				//Si le boost est disponible et qu'on est assez loin, on boost
-				if (isBoostAvailable
-					&& distTowardCheckpoint >= CHECKPOINT_BOOST_APPROACH_DIST
-					&& diffAngleTowardCheckpoint < 20
-					&& diffAngleTowardCheckpoint > -20) {
-					thrust = 999;   //BOOST
-					isBoostAvailable = false;
+				Point checkpointAfterwardCoords (checkpointAfterward->x, checkpointAfterward->y);
+				float timeTakenToReachCheckpoint = -1;
+				bool activateShield = false;
+				int testThrust = thrust; //100;
+				for (; timeTakenToReachCheckpoint > -1 || testThrust > 10; testThrust-=10){
+					timeTakenToReachCheckpoint = pod->isCheckpointReachable(*nextCheckpointCoords, testThrust, checkpointAfterwardCoords, 3.0);
 				}
-				
-				//TODO: Evidemment temporaire pour tester
-				//Si on pense avoir le checkpoint
-				Point threeTurnVaguePrediction (pod->x+3*pod->vx, pod->y+3*pod->vy);
-				
-				if (threeTurnVaguePrediction.distance(*nextCheckpointCoords) < CHECKPOINT_RADIUS) {
-					int otherCheckpointId = pod->nextCheckpointId + 1;
-					if (otherCheckpointId >= checkpointCount) otherCheckpointId = 0;
-					Checkpoint* otherCheckpoint = checkpointList[otherCheckpointId];
+				if (timeTakenToReachCheckpoint != -1){
+					for (int i=0; activateShield || i<4; i++){
+						if (i != pod->id){
+							Pod* otherPod = podList[i];
+							Checkpoint* otherPodCheckpoint = checkpointList[otherPod->nextCheckpointId];
+							Point otherPodTarget (otherPodCheckpoint->x, otherPodCheckpoint->y);
+							activateShield = pod->isCollisionPossibleWithMovement(checkpointAfterwardCoords, testThrust, otherPod, otherPodTarget, 100);
+						}
+					}
+					//Si on peut tourner tout de suite en validant le checkpoint actuel, on le fait
+					if (activateShield){
+						thrust = -1;
+					}
+					else{
+						cerr << "On peut passer le checkpoint : on tourne directement" << endl;
+						thrust = testThrust;
+					}
+					destinationX = checkpointAfterwardCoords.x;
+					destinationY = checkpointAfterwardCoords.y;
+				}
+				else{
+					//Si le boost est disponible et qu'on est assez loin, on boost
+					if (isBoostAvailable
+						&& distTowardCheckpoint >= CHECKPOINT_BOOST_APPROACH_DIST
+						&& diffAngleTowardCheckpoint < 20
+						&& diffAngleTowardCheckpoint > -20) {
+						thrust = 999;   //BOOST
+						isBoostAvailable = false;
+					}
 					
-					thrust = 10;
-					destinationX = otherCheckpoint->x;
-					destinationY = otherCheckpoint->y;
+					//TODO: Evidemment temporaire pour tester
+					//Si on pense avoir le checkpoint
+					/*
+					Point threeTurnVaguePrediction (pod->x+3*pod->vx, pod->y+3*pod->vy);
+					
+					if (threeTurnVaguePrediction.distance(*nextCheckpointCoords) < CHECKPOINT_RADIUS) {
+						int otherCheckpointId = pod->nextCheckpointId + 1;
+						if (otherCheckpointId >= checkpointCount) otherCheckpointId = 0;
+						Checkpoint* otherCheckpoint = checkpointList[otherCheckpointId];
+						
+						thrust = 10;
+						destinationX = otherCheckpoint->x;
+						destinationY = otherCheckpoint->y;
+					}
+					*/
 				}
-				*/
+				
 			}
-			
-			
-			
-			
 			
 			if (thrust <= 100 && thrust >= 0) {
 				cout << destinationX << " " << destinationY << " " << thrust << " " << diffAngleTowardCheckpoint << endl;
