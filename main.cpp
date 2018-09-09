@@ -559,10 +559,15 @@ int main()
 				float steeringNormalizedY = desiredNormalizedY - (pod->vy)/speedVectorDet;
 				
 				//Point tres eloigne dans la direction du vecteur de steering
-				destinationX = pod->x + 10000*steeringNormalizedX;
-				destinationY = pod->y + 10000*steeringNormalizedY;
+				destinationX = nextCheckpoint->x + steeringNormalizedX; //pod->x + 10000.0*steeringNormalizedX;
+				destinationY = nextCheckpoint->y + steeringNormalizedY; //pod->y + 10000.0*steeringNormalizedY;
 				
-				dotProductSpeedAndAngleCheckpoint = dotProduct(pod->vx/speedVectorDet, pod->vy/speedVectorDet, desiredNormalizedX, desiredNormalizedY);
+				
+				dotProductSpeedAndAngleCheckpoint = dotProduct(pod->vx/speedVectorDet, pod->vy/speedVectorDet, destinationX, destinationY);
+				cerr << "pod->x " << pod->x << endl;
+				cerr << "pod->y " << pod->y << endl;
+				cerr << "destinationX " << destinationX << endl;
+				cerr << "destinationY " << destinationY << endl;
 				
 				cerr << "pod->vx " << pod->vx << endl;
 				cerr << "speedVectorDet " << speedVectorDet << endl;
@@ -591,7 +596,7 @@ int main()
 					cerr << "speed = 0 donc thrust=100" << endl;
 				}
 				
-				
+				/*
 				//Si le boost est disponible et qu'on est assez loin, on boost
 				if (isBoostAvailable
 					&& distTowardCheckpoint >= CHECKPOINT_BOOST_APPROACH_DIST
@@ -614,6 +619,7 @@ int main()
 					destinationX = otherCheckpoint->x;
 					destinationY = otherCheckpoint->y;
 				}
+				*/
 			}
 			
 			
